@@ -17,22 +17,22 @@ const (
 )
 
 var host = flag.String("host", "localhost", "Address to bind")
-var pushport = flag.String("pushport", "9099", "Port to bind for pushing")
-var poolport = flag.String("poolport", "9098", "Port to bind for pooling")
+var pushPort = flag.String("pushPort", "9099", "Port to bind for pushing")
+var poolPort = flag.String("poolPort", "9098", "Port to bind for pooling")
 var logfile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
 
-var pushhostport string
-var poolhostport string
+var pushHostPort string
+var poolHostPort string
 
 var clientPool map[string][]poolClient
 
-type PUSHDATA struct {
+type PushData struct {
 	Title string
 	Body  string
 	Token string
 }
 
-type FIRSTMESSAGE struct {
+type FirstMessage struct {
 	Token string
 }
 
@@ -67,7 +67,7 @@ func (p *poolClient) removeFromPool() {
 	}
 }
 
-func (p *poolClient) Send(v *PUSHDATA) {
+func (p *poolClient) Send(v *PushData) {
 	defer func() {
 		if x := recover(); x != nil {
 			log.Printf("Unable to send: %s\n", x)
@@ -94,7 +94,7 @@ func (p *poolClient) Listen() {
 				return
 			} else {
 				log.Printf("Received data from client %s\n", buf)
-				var first FIRSTMESSAGE
+				var first FirstMessage
 				if err := json.Unmarshal(buf[0:count], &first); err != nil {
 					log.Printf("Failed to parse data from client (%s)\n", err)
 				} else {
@@ -142,7 +142,7 @@ func pushHandle(conn net.Conn) {
 		log.Printf("Closing client\n")
 		return
 	}
-	var v PUSHDATA
+	var v PushData
 	if err := json.Unmarshal(buf[0:count], &v); err != nil {
 		log.Printf("Failed to parse data %s (%s)\n", buf, err)
 	} else {
@@ -158,8 +158,8 @@ func pushHandle(conn net.Conn) {
 
 func main() {
 	flag.Parse()
-	pushhostport = fmt.Sprintf("%s:%s", *host, *pushport)
-	poolhostport = fmt.Sprintf("%s:%s", *host, *poolport)
+	pushHostPort = fmt.Sprintf("%s:%s", *host, *pushPort)
+	poolHostPort = fmt.Sprintf("%s:%s", *host, *poolPort)
 
 	f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -170,21 +170,21 @@ func main() {
 
 	clientPool = make(map[string][]poolClient)
 
-	pushsock, err := net.Listen("tcp", pushhostport)
+	pushsock, err := net.Listen("tcp", pushHostPort)
 	if err != nil {
-		log.Fatalf("Couldn't bind %s for push socket (%s)\n", pushhostport, err)
+		log.Fatalf("Couldn't bind %s for push socket (%s)\n", pushHostPort, err)
 		return
 	}
 	defer pushsock.Close()
 
-	poolsock, err := net.Listen("tcp", poolhostport)
+	poolsock, err := net.Listen("tcp", poolHostPort)
 	if err != nil {
-		log.Fatalf("Couldn't bind %s for pool socket (%s)\n", poolhostport, err)
+		log.Fatalf("Couldn't bind %s for pool socket (%s)\n", poolHostPort, err)
 		return
 	}
 	defer poolsock.Close()
 
-	log.Printf("Listening connections on %s and on %s\n", pushhostport, poolhostport)
+	log.Printf("Listening connections on %s and on %s\n", pushHostPort, poolHostPort)
 
 	// pushing
 	go func() {
