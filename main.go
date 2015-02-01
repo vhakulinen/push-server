@@ -91,8 +91,6 @@ type PushData struct {
 	Title string
 	Body  string
 	Token string
-
-	fetched chan bool `sql:"-"`
 }
 
 func SavePushData(title, body, token string) (p *PushData, err error) {
