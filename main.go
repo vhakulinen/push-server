@@ -20,6 +20,7 @@ var host = flag.String("host", "localhost", "Address to bind")
 var pushPort = flag.String("pushPort", "9099", "Port to bind for pushing")
 var poolPort = flag.String("poolPort", "9098", "Port to bind for pooling")
 var logfile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
+var logToTty = flag.Bool("logtty", false, "Output log to tty")
 
 var pushHostPort string
 var poolHostPort string
@@ -162,12 +163,14 @@ func main() {
 	pushHostPort = fmt.Sprintf("%s:%s", *host, *pushPort)
 	poolHostPort = fmt.Sprintf("%s:%s", *host, *poolPort)
 
-	f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
+	if !*logToTty {
+		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalf("error opening file: %v", err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
 	}
-	defer f.Close()
-	log.SetOutput(f)
 
 	pushsock, err := net.Listen("tcp", pushHostPort)
 	if err != nil {
