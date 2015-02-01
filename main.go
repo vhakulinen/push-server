@@ -113,7 +113,6 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Something went wrong! (%v)", err)
 	}
-	// TODO(vhakulinen): serve pushdata (on tcp and http timeouts)
 }
 
 func TokenHandler(w http.ResponseWriter, r *http.Request) {
