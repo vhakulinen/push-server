@@ -36,8 +36,9 @@ var httpHostPort string
 var tcpHostPort string
 
 type HttpToken struct {
-	Id        int64
-	CreatedAt time.Time
+	Id         int64
+	CreatedAt  time.Time
+	AccessedAt time.Time
 
 	Token string `sql:unique`
 	Key   string
@@ -48,8 +49,9 @@ func RegisterHttpToken(token, key string) (t *HttpToken, err error) {
 	t = new(HttpToken)
 	if db.Where("token = ?", token).First(t).RecordNotFound() {
 		t = &HttpToken{
-			Token: token,
-			Key:   key,
+			Token:      token,
+			Key:        key,
+			AccessedAt: time.Now(),
 		}
 		if err = db.Save(t).Error; err != nil {
 			return nil, err
@@ -74,15 +76,21 @@ func GetHttpToken(token, key string) (t *HttpToken, err error) {
 	if key != t.Key {
 		return nil, fmt.Errorf("Invalid key or token not found")
 	}
+	db.Save(t)
+	t.AccessedAt = time.Now()
+	if err := db.Save(t).Error; err != nil {
+		log.Printf("Cannot save HttpToken (%v)", err)
+	}
 	return t, nil
 }
 
 type PushData struct {
 	Id        int64
 	CreatedAt time.Time
-	Title     string
-	Body      string
-	Token     string
+
+	Title string
+	Body  string
+	Token string
 
 	fetched chan bool `sql:"-"`
 }
@@ -167,7 +175,7 @@ func DeleteExpiredHttpTokensAndPushDatas() {
 		tokens := []*HttpToken{}
 		db.Find(&tokens)
 		for _, token := range tokens {
-			if time.Since(token.CreatedAt) > time.Minute*HttpTokenExpires {
+			if time.Since(token.AccessedAt) > time.Minute*HttpTokenExpires {
 				db.Delete(token)
 			}
 		}
