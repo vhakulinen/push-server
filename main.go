@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	PUSH_READ_TIMEOUT = 156
-	BUF_SIZE          = 1024
+	PushReadTimeout = 156
+	BufSize         = 1024
 )
 
 var host = flag.String("host", "localhost", "Address to bind")
@@ -88,7 +88,7 @@ func (p *poolClient) Listen() {
 	defer p.conn.Close()
 	go func() {
 		for {
-			buf := make([]byte, BUF_SIZE)
+			buf := make([]byte, BufSize)
 			count, err := p.conn.Read(buf)
 			if err != nil {
 				log.Printf("Client exited\n")
@@ -132,8 +132,8 @@ func (p *poolClient) Listen() {
 func pushHandle(conn net.Conn) {
 	defer conn.Close()
 	addr := conn.RemoteAddr()
-	buf := make([]byte, BUF_SIZE)
-	conn.SetReadDeadline(time.Now().Add(time.Second * PUSH_READ_TIMEOUT))
+	buf := make([]byte, BufSize)
+	conn.SetReadDeadline(time.Now().Add(time.Second * PushReadTimeout))
 	count, err := conn.Read(buf)
 	if err != nil {
 		if err == io.EOF {
