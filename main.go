@@ -17,6 +17,11 @@ import (
 const (
 	TokenMinLength = 8
 	KeyMinLength   = 5
+
+	// In minutes
+	DeleteLoopInterval = 5
+	HttpTokenExpires   = 10
+	PushDataExpires    = 10
 )
 
 var host = flag.String("host", "localhost", "Address to bind")
@@ -75,10 +80,9 @@ func GetHttpToken(token, key string) (t *HttpToken, err error) {
 type PushData struct {
 	Id        int64
 	CreatedAt time.Time
-
-	Title string
-	Body  string
-	Token string
+	Title     string
+	Body      string
+	Token     string
 
 	fetched chan bool `sql:"-"`
 }
@@ -157,6 +161,28 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Runs in its own goroutine. Deletes expired http tokens and data pushes
+// on that token
+func DeleteExpiredHttpTokensAndPushDatas() {
+	for {
+		tokens := []*HttpToken{}
+		db.Find(&tokens)
+		for _, token := range tokens {
+			if time.Since(token.CreatedAt) > time.Minute*HttpTokenExpires {
+				db.Delete(token)
+			}
+		}
+		pushdatas := []*PushData{}
+		db.Find(&pushdatas)
+		for _, data := range pushdatas {
+			if time.Since(data.CreatedAt) > time.Minute*PushDataExpires {
+				db.Delete(data)
+			}
+		}
+		time.Sleep(time.Minute * DeleteLoopInterval)
+	}
+}
+
 func main() {
 	flag.Parse()
 	httpHostPort = fmt.Sprintf("%s:%s", *host, *httpPort)
@@ -177,6 +203,8 @@ func main() {
 		return
 	}
 	defer tcpPoolSock.Close()
+
+	go DeleteExpiredHttpTokensAndPushDatas()
 
 	// TCP pooling
 	go func() {
