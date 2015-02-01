@@ -4,167 +4,166 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"time"
+
+	"github.com/jinzhu/gorm"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
-	PushReadTimeout = 156
-	BufSize         = 1024
+	TokenMinLength = 8
+	KeyMinLength   = 5
 )
 
 var host = flag.String("host", "localhost", "Address to bind")
-var pushPort = flag.String("pushPort", "9099", "Port to bind for pushing")
-var poolPort = flag.String("poolPort", "9098", "Port to bind for pooling")
-var logfile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
+var httpPort = flag.String("httpport", "8080", "Port to bind for pushing and http pooling")
+var tcpPort = flag.String("poolport", "9098", "Port to bind for tcp pooling")
+var logFile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
 var logToTty = flag.Bool("logtty", false, "Output log to tty")
 
-var pushHostPort string
-var poolHostPort string
+var db gorm.DB
 
-// TODO: Add safe read/write functions to clientPool
-var clientPool map[string][]poolClient
+var httpHostPort string
+var tcpHostPort string
+
+type HttpToken struct {
+	Id        int64
+	CreatedAt time.Time
+
+	Token string `sql:unique`
+	Key   string
+}
+
+// Register token for http pooling
+func RegisterHttpToken(token, key string) (t *HttpToken, err error) {
+	t = new(HttpToken)
+	if db.Where("token = ?", token).First(t).RecordNotFound() {
+		t = &HttpToken{
+			Token: token,
+			Key:   key,
+		}
+		if err = db.Save(t).Error; err != nil {
+			return nil, err
+		}
+		return t, nil
+	}
+	return nil, fmt.Errorf("HttpToken already registered")
+}
+
+func (t *HttpToken) GetPushes() []*PushData {
+	pushes := []*PushData{}
+	db.Where("token = ?", t.Token).Find(&pushes)
+	return pushes
+}
+
+// Queries db for tokens and returns one of token and key matches
+func GetHttpToken(token, key string) (t *HttpToken, err error) {
+	t = new(HttpToken)
+	if db.Where("token = ?", token).First(t).RecordNotFound() {
+		return nil, fmt.Errorf("Invalid key or token not found")
+	}
+	if key != t.Key {
+		return nil, fmt.Errorf("Invalid key or token not found")
+	}
+	return t, nil
+}
 
 type PushData struct {
+	Id        int64
+	CreatedAt time.Time
+
 	Title string
 	Body  string
 	Token string
+
+	fetched chan bool `sql:"-"`
 }
 
-type FirstMessage struct {
-	Token string
-}
-
-type poolClient struct {
-	conn     net.Conn
-	addr     net.Addr
-	sendchan chan []byte
-	token    string
-}
-
-func NewPoolClient(conn net.Conn) *poolClient {
-	p := &poolClient{
-		conn:     conn,
-		addr:     conn.RemoteAddr(),
-		sendchan: make(chan []byte),
+func SavePushData(title, body, token string) (p *PushData, err error) {
+	p = &PushData{
+		Title: title,
+		Body:  body,
+		Token: token,
 	}
-	return p
-}
-
-func (p *poolClient) removeFromPool() {
-	if slice, ok := clientPool[p.token]; ok {
-		count := 0
-		for i, client := range slice {
-			if client == *p {
-				break
-			}
-			i++
-		}
-		slice = append(slice[:count], slice[count+1:]...)
-		clientPool[p.token] = slice
-		log.Printf("Removed client from pool\n")
+	if err = db.Save(p).Error; err != nil {
+		return nil, err
 	}
+	return p, nil
 }
 
-func (p *poolClient) Send(v *PushData) {
-	defer func() {
-		if x := recover(); x != nil {
-			log.Printf("Unable to send: %s\n", x)
-		}
-	}()
-	data, err := json.Marshal(v)
+func (p *PushData) ToJson() ([]byte, error) {
+	b, err := json.Marshal(p)
 	if err != nil {
-		log.Printf("Failed to parse data to be sended to client (%s)\n", err)
-		return
+		return nil, err
 	}
-	p.sendchan <- data
+	return b, nil
 }
 
-// Gorutine for pool client
-func (p *poolClient) Listen() {
-	defer p.conn.Close()
-	go func() {
-		for {
-			buf := make([]byte, BufSize)
-			count, err := p.conn.Read(buf)
-			if err != nil {
-				log.Printf("Client exited\n")
-				close(p.sendchan)
-				return
-			} else {
-				log.Printf("Received data from client %s\n", buf)
-				var first FirstMessage
-				if err := json.Unmarshal(buf[0:count], &first); err != nil {
-					log.Printf("Failed to parse data from client (%s)\n", err)
-				} else {
-					_, ok := clientPool[first.Token]
-					if ok {
-						clientPool[first.Token] = append(clientPool[first.Token], *p)
-					} else {
-						clientPool[first.Token] = []poolClient{*p}
-					}
-					p.token = first.Token
-					log.Printf("Added client to pool with token %s\n", p.token)
-				}
-			}
-		}
-	}()
-	for {
-		data, ok := <-p.sendchan
-		if ok {
-			_, err := p.conn.Write(data)
-			if err != nil {
-				log.Printf("Failed to write data to client (%s)", err)
-				log.Printf("Closing client")
-				p.conn.Close()
-			}
-		} else {
-			log.Printf("Channel closed, exiting client\n")
-			p.removeFromPool()
-			return
-		}
-	}
-}
-
-func pushHandle(conn net.Conn) {
-	defer conn.Close()
-	addr := conn.RemoteAddr()
-	buf := make([]byte, BufSize)
-	conn.SetReadDeadline(time.Now().Add(time.Second * PushReadTimeout))
-	count, err := conn.Read(buf)
+func PushHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	_, err := SavePushData(r.FormValue("title"), r.FormValue("body"), r.FormValue("token"))
 	if err != nil {
-		if err == io.EOF {
-			log.Printf("Client closed (%s)\n", err)
-		} else {
-			log.Printf("Failed to receive data from %s (%s)\n", addr.String(), err)
-		}
-		log.Printf("Closing client\n")
-		return
+		log.Printf("Something went wrong! (%v)", err)
 	}
-	var v PushData
-	if err := json.Unmarshal(buf[0:count], &v); err != nil {
-		log.Printf("Failed to parse data %s (%s)\n", buf, err)
+	// TODO(vhakulinen): serve pushdata (on tcp and http timeouts)
+}
+
+func TokenHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	token := r.FormValue("token")
+	key := r.FormValue("key")
+	// Use register variable to register new token
+	if len(token) < TokenMinLength && len(key) < KeyMinLength {
+		w.WriteHeader(http.StatusNotAcceptable)
+		w.Write([]byte(fmt.Sprintf("Token min length: %d\nKey min length: %d", TokenMinLength, KeyMinLength)))
 	} else {
-		log.Printf("Received data Title: %s Body: %s Token: %s from %s\n",
-			v.Title, v.Body, v.Token, conn.RemoteAddr())
-		if clientSlice, ok := clientPool[v.Token]; ok {
-			for _, client := range clientSlice {
-				client.Send(&v)
-			}
+		_, err := RegisterHttpToken(token, key)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(fmt.Sprintf("Error (%s)", err)))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("Token registered"))
 		}
+	}
+}
+
+func PoolHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	token := r.FormValue("token")
+	key := r.FormValue("key")
+	t, err := GetHttpToken(token, key)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(http.StatusText(http.StatusNotFound)))
+	} else {
+		data := ""
+		for _, push := range t.GetPushes() {
+			tmp, err := push.ToJson()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Something went wrong!"))
+				log.Printf("%v", err)
+				return
+			}
+			data += string(tmp)
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(data))
 	}
 }
 
 func main() {
 	flag.Parse()
-	pushHostPort = fmt.Sprintf("%s:%s", *host, *pushPort)
-	poolHostPort = fmt.Sprintf("%s:%s", *host, *poolPort)
+	httpHostPort = fmt.Sprintf("%s:%s", *host, *httpPort)
+	tcpHostPort = fmt.Sprintf("%s:%s", *host, *tcpPort)
 
 	if !*logToTty {
-		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		f, err := os.OpenFile(*logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			log.Fatalf("error opening file: %v", err)
 		}
@@ -172,46 +171,40 @@ func main() {
 		log.SetOutput(f)
 	}
 
-	pushsock, err := net.Listen("tcp", pushHostPort)
+	tcpPoolSock, err := net.Listen("tcp", tcpHostPort)
 	if err != nil {
-		log.Fatalf("Couldn't bind %s for push socket (%s)\n", pushHostPort, err)
+		log.Fatalf("Couldn't bind %s for push socket (%s)\n", tcpHostPort, err)
 		return
 	}
-	defer pushsock.Close()
+	defer tcpPoolSock.Close()
 
-	poolsock, err := net.Listen("tcp", poolHostPort)
-	if err != nil {
-		log.Fatalf("Couldn't bind %s for pool socket (%s)\n", poolHostPort, err)
-		return
-	}
-	defer poolsock.Close()
-
-	log.Printf("Listening connections on %s and on %s\n", pushHostPort, poolHostPort)
-
-	// pushing
+	// TCP pooling
 	go func() {
 		for {
-			conn, err := pushsock.Accept()
+			conn, err := tcpPoolSock.Accept()
 			if err != nil {
-				log.Print("Failed to accept connection on push (%s)\n", err)
+				log.Printf("Failed to accept connection on pool (%s)\n", err)
 			} else {
-				go pushHandle(conn)
+				// TODO(vhakulinen): Implement tcp client
+				conn.Close()
 			}
 		}
 	}()
 
-	// pooling
-	for {
-		conn, err := poolsock.Accept()
-		if err != nil {
-			log.Printf("Failed to accept connection on pool (%s)\n", err)
-		} else {
-			p := NewPoolClient(conn)
-			go p.Listen()
-		}
+	http.HandleFunc("/push/", PushHandler)
+	http.HandleFunc("/pool/", PoolHandler)
+	http.HandleFunc("/token/", TokenHandler)
+	if err = http.ListenAndServe(httpHostPort, nil); err != nil {
+		log.Fatal(err)
 	}
 }
 
 func init() {
-	clientPool = make(map[string][]poolClient)
+	var err error
+	db, err = gorm.Open("sqlite3", "db.sqlite3")
+	if err != nil {
+		log.Fatal(err)
+	}
+	db.AutoMigrate(&PushData{})
+	db.AutoMigrate(&HttpToken{})
 }
