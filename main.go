@@ -168,8 +168,6 @@ func main() {
 	defer f.Close()
 	log.SetOutput(f)
 
-	clientPool = make(map[string][]poolClient)
-
 	pushsock, err := net.Listen("tcp", pushHostPort)
 	if err != nil {
 		log.Fatalf("Couldn't bind %s for push socket (%s)\n", pushHostPort, err)
@@ -208,4 +206,8 @@ func main() {
 			go p.Listen()
 		}
 	}
+}
+
+func init() {
+	clientPool = make(map[string][]poolClient)
 }
