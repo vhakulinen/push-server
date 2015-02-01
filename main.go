@@ -24,6 +24,7 @@ var logfile = flag.String("logfile", "/var/log/push-server.log", "File to save l
 var pushHostPort string
 var poolHostPort string
 
+// TODO: Add safe read/write functions to clientPool
 var clientPool map[string][]poolClient
 
 type PushData struct {
