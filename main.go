@@ -29,6 +29,8 @@ var httpPort = flag.String("httpport", "8080", "Port to bind for pushing and htt
 var tcpPort = flag.String("poolport", "9098", "Port to bind for tcp pooling")
 var logFile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
 var logToTty = flag.Bool("logtty", false, "Output log to tty")
+var certPemFile = flag.String("cert", "cert.pem", "Certificate pem file")
+var keyPemFile = flag.String("key", "key.pem", "Key pem file")
 
 var db gorm.DB
 
@@ -227,7 +229,7 @@ func main() {
 	http.HandleFunc("/push/", PushHandler)
 	http.HandleFunc("/pool/", PoolHandler)
 	http.HandleFunc("/token/", TokenHandler)
-	if err = http.ListenAndServe(httpHostPort, nil); err != nil {
+	if err = http.ListenAndServeTLS(httpHostPort, *certPemFile, *keyPemFile, nil); err != nil {
 		log.Fatal(err)
 	}
 }
