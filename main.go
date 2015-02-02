@@ -66,6 +66,10 @@ func RegisterHttpToken(token, key string) (t *HttpToken, err error) {
 func (t *HttpToken) GetPushes() []*PushData {
 	pushes := []*PushData{}
 	db.Where("token = ?", t.Token).Find(&pushes)
+	// Remove fetched pushes
+	for _, p := range pushes {
+		db.Delete(p)
+	}
 	return pushes
 }
 
