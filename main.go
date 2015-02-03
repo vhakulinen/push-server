@@ -4,12 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/vhakulinen/push-server/pushserv"
 )
 
@@ -25,14 +23,12 @@ const (
 
 var host = flag.String("host", "localhost", "Address to bind")
 var httpPort = flag.String("httpport", "8080", "Port to bind for pushing and http pooling")
-var tcpPort = flag.String("poolport", "9098", "Port to bind for tcp pooling")
 var logFile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
 var logToTty = flag.Bool("logtty", false, "Output log to tty")
 var certPemFile = flag.String("cert", "cert.pem", "Certificate pem file")
 var keyPemFile = flag.String("key", "key.pem", "Key pem file")
 
 var httpHostPort string
-var tcpHostPort string
 
 func PushHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
@@ -110,7 +106,6 @@ func DeleteExpiredHttpTokensAndPushDatas() {
 func main() {
 	flag.Parse()
 	httpHostPort = fmt.Sprintf("%s:%s", *host, *httpPort)
-	tcpHostPort = fmt.Sprintf("%s:%s", *host, *tcpPort)
 
 	if !*logToTty {
 		f, err := os.OpenFile(*logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -121,32 +116,12 @@ func main() {
 		log.SetOutput(f)
 	}
 
-	tcpPoolSock, err := net.Listen("tcp", tcpHostPort)
-	if err != nil {
-		log.Fatalf("Couldn't bind %s for push socket (%s)\n", tcpHostPort, err)
-		return
-	}
-	defer tcpPoolSock.Close()
-
 	go DeleteExpiredHttpTokensAndPushDatas()
-
-	// TCP pooling
-	go func() {
-		for {
-			conn, err := tcpPoolSock.Accept()
-			if err != nil {
-				log.Printf("Failed to accept connection on pool (%s)\n", err)
-			} else {
-				// TODO(vhakulinen): Implement tcp client
-				conn.Close()
-			}
-		}
-	}()
 
 	http.HandleFunc("/push/", PushHandler)
 	http.HandleFunc("/pool/", PoolHandler)
 	http.HandleFunc("/token/", TokenHandler)
-	if err = http.ListenAndServeTLS(httpHostPort, *certPemFile, *keyPemFile, nil); err != nil {
+	if err := http.ListenAndServeTLS(httpHostPort, *certPemFile, *keyPemFile, nil); err != nil {
 		log.Fatal(err)
 	}
 }
