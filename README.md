@@ -32,8 +32,3 @@ curl localhost:8080/push/ -d token=<your_token_here> -d body=<message_body> \
 
 ### Server
 `-h` flag will do the trick
-
-
-# TODOs:
-* TCP client for instant notifies
-* SSL
