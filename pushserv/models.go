@@ -50,9 +50,9 @@ type PushData struct {
 	Id        int64
 	CreatedAt time.Time
 
-	Title string `sql:"not null;unique"`
+	Title string `sql:"not null"`
 	Body  string
-	Token string `sql:"not null;unique"`
+	Token string `sql:"not null"`
 }
 
 func SavePushData(title, body, token string) (p *PushData, err error) {
