@@ -42,7 +42,6 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	token := r.FormValue("token")
 	key := r.FormValue("key")
-	// Use register variable to register new token
 	if len(token) < TokenMinLength && len(key) < KeyMinLength {
 		w.WriteHeader(http.StatusNotAcceptable)
 		w.Write([]byte(fmt.Sprintf("Token min length: %d\nKey min length: %d", TokenMinLength, KeyMinLength)))
