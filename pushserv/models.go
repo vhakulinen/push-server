@@ -11,8 +11,8 @@ type HttpToken struct {
 	CreatedAt  time.Time
 	AccessedAt time.Time
 
-	Token string `sql:unique`
-	Key   string
+	Token string `sql:"not null;unique"`
+	Key   string `sql:"not null;unique"`
 }
 
 // Register token for http pooling
@@ -50,9 +50,9 @@ type PushData struct {
 	Id        int64
 	CreatedAt time.Time
 
-	Title string
+	Title string `sql:"not null;unique"`
 	Body  string
-	Token string
+	Token string `sql:"not null;unique"`
 }
 
 func SavePushData(title, body, token string) (p *PushData, err error) {
