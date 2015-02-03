@@ -56,6 +56,9 @@ type PushData struct {
 }
 
 func SavePushData(title, body, token string) (p *PushData, err error) {
+	if title == "" || token == "" {
+		return nil, fmt.Errorf("token and title required")
+	}
 	p = &PushData{
 		Title: title,
 		Body:  body,
