@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -10,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/vhakulinen/push-server/pushserv"
 )
 
 const (
@@ -32,96 +31,12 @@ var logToTty = flag.Bool("logtty", false, "Output log to tty")
 var certPemFile = flag.String("cert", "cert.pem", "Certificate pem file")
 var keyPemFile = flag.String("key", "key.pem", "Key pem file")
 
-var db gorm.DB
-
 var httpHostPort string
 var tcpHostPort string
 
-type HttpToken struct {
-	Id         int64
-	CreatedAt  time.Time
-	AccessedAt time.Time
-
-	Token string `sql:unique`
-	Key   string
-}
-
-// Register token for http pooling
-func RegisterHttpToken(token, key string) (t *HttpToken, err error) {
-	t = new(HttpToken)
-	if db.Where("token = ?", token).First(t).RecordNotFound() {
-		t = &HttpToken{
-			Token:      token,
-			Key:        key,
-			AccessedAt: time.Now(),
-		}
-		if err = db.Save(t).Error; err != nil {
-			return nil, err
-		}
-		return t, nil
-	}
-	return nil, fmt.Errorf("HttpToken already registered")
-}
-
-func (t *HttpToken) GetPushes() []*PushData {
-	pushes := []*PushData{}
-	db.Where("token = ?", t.Token).Find(&pushes)
-	// Remove fetched pushes
-	for _, p := range pushes {
-		db.Delete(p)
-	}
-	return pushes
-}
-
-// Queries db for tokens and returns one of token and key matches
-func GetHttpToken(token, key string) (t *HttpToken, err error) {
-	t = new(HttpToken)
-	if db.Where("token = ?", token).First(t).RecordNotFound() {
-		return nil, fmt.Errorf("Invalid key or token not found")
-	}
-	if key != t.Key {
-		return nil, fmt.Errorf("Invalid key or token not found")
-	}
-	db.Save(t)
-	t.AccessedAt = time.Now()
-	if err := db.Save(t).Error; err != nil {
-		log.Printf("Cannot save HttpToken (%v)", err)
-	}
-	return t, nil
-}
-
-type PushData struct {
-	Id        int64
-	CreatedAt time.Time
-
-	Title string
-	Body  string
-	Token string
-}
-
-func SavePushData(title, body, token string) (p *PushData, err error) {
-	p = &PushData{
-		Title: title,
-		Body:  body,
-		Token: token,
-	}
-	if err = db.Save(p).Error; err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-func (p *PushData) ToJson() ([]byte, error) {
-	b, err := json.Marshal(p)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
 func PushHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	_, err := SavePushData(r.FormValue("title"), r.FormValue("body"), r.FormValue("token"))
+	_, err := pushserv.SavePushData(r.FormValue("title"), r.FormValue("body"), r.FormValue("token"))
 	if err != nil {
 		log.Printf("Something went wrong! (%v)", err)
 	}
@@ -136,7 +51,7 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotAcceptable)
 		w.Write([]byte(fmt.Sprintf("Token min length: %d\nKey min length: %d", TokenMinLength, KeyMinLength)))
 	} else {
-		_, err := RegisterHttpToken(token, key)
+		_, err := pushserv.RegisterHttpToken(token, key)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(fmt.Sprintf("Error (%s)", err)))
@@ -151,7 +66,7 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	token := r.FormValue("token")
 	key := r.FormValue("key")
-	t, err := GetHttpToken(token, key)
+	t, err := pushserv.GetHttpToken(token, key)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
@@ -176,18 +91,16 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 // on that token
 func DeleteExpiredHttpTokensAndPushDatas() {
 	for {
-		tokens := []*HttpToken{}
-		db.Find(&tokens)
+		tokens := pushserv.GetAllTokens()
 		for _, token := range tokens {
 			if time.Since(token.AccessedAt) > time.Minute*HttpTokenExpires {
-				db.Delete(token)
+				token.Delete()
 			}
 		}
-		pushdatas := []*PushData{}
-		db.Find(&pushdatas)
+		pushdatas := pushserv.GetAllPushDatas()
 		for _, data := range pushdatas {
 			if time.Since(data.CreatedAt) > time.Minute*PushDataExpires {
-				db.Delete(data)
+				data.Delete()
 			}
 		}
 		time.Sleep(time.Minute * DeleteLoopInterval)
@@ -236,14 +149,4 @@ func main() {
 	if err = http.ListenAndServeTLS(httpHostPort, *certPemFile, *keyPemFile, nil); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func init() {
-	var err error
-	db, err = gorm.Open("sqlite3", "db.sqlite3")
-	if err != nil {
-		log.Fatal(err)
-	}
-	db.AutoMigrate(&PushData{})
-	db.AutoMigrate(&HttpToken{})
 }
