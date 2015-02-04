@@ -62,12 +62,14 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 		_, err = pushserv.SavePushData(title, body, token, timestamp)
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
+			// TODO: notify user?
 		}
 		return
 	}
 	_, err := pushserv.SavePushDataMinimal(title, body, token)
 	if err != nil {
 		log.Printf("Something went wrong! (%v)", err)
+		// TODO: notify user?
 	}
 }
 
