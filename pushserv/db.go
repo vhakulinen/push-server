@@ -48,4 +48,5 @@ func init() {
 	}
 	db.AutoMigrate(&PushData{})
 	db.AutoMigrate(&HttpToken{})
+	db.AutoMigrate(&User{})
 }

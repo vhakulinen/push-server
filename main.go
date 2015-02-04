@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/vhakulinen/push-server/pushserv"
 )
@@ -14,11 +13,6 @@ import (
 const (
 	TokenMinLength = 8
 	KeyMinLength   = 5
-
-	// In minutes
-	DeleteLoopInterval = 5
-	HttpTokenExpires   = 10
-	PushDataExpires    = 10
 )
 
 var host = flag.String("host", "localhost", "Address to bind")
@@ -30,30 +24,31 @@ var keyPemFile = flag.String("key", "key.pem", "Key pem file")
 
 var httpHostPort string
 
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	user, err := pushserv.NewUser(email, password)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("%v", err)))
+		return
+	}
+	t, err := user.GetHttpToken()
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("%v", err)))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("%s:%s", t.Token, t.Key)))
+}
+
 func PushHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	_, err := pushserv.SavePushData(r.FormValue("title"), r.FormValue("body"), r.FormValue("token"))
 	if err != nil {
 		log.Printf("Something went wrong! (%v)", err)
-	}
-}
-
-func TokenHandler(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	token := r.FormValue("token")
-	key := r.FormValue("key")
-	if len(token) < TokenMinLength && len(key) < KeyMinLength {
-		w.WriteHeader(http.StatusNotAcceptable)
-		w.Write([]byte(fmt.Sprintf("Token min length: %d\nKey min length: %d", TokenMinLength, KeyMinLength)))
-	} else {
-		_, err := pushserv.RegisterHttpToken(token, key)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(fmt.Sprintf("Error (%s)", err)))
-		} else {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Token registered"))
-		}
 	}
 }
 
@@ -82,26 +77,6 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Runs in its own goroutine. Deletes expired http tokens and data pushes
-// on that token
-func DeleteExpiredHttpTokensAndPushDatas() {
-	for {
-		tokens := pushserv.GetAllTokens()
-		for _, token := range tokens {
-			if time.Since(token.AccessedAt) > time.Minute*HttpTokenExpires {
-				token.Delete()
-			}
-		}
-		pushdatas := pushserv.GetAllPushDatas()
-		for _, data := range pushdatas {
-			if time.Since(data.CreatedAt) > time.Minute*PushDataExpires {
-				data.Delete()
-			}
-		}
-		time.Sleep(time.Minute * DeleteLoopInterval)
-	}
-}
-
 func main() {
 	flag.Parse()
 	httpHostPort = fmt.Sprintf("%s:%s", *host, *httpPort)
@@ -115,11 +90,9 @@ func main() {
 		log.SetOutput(f)
 	}
 
-	go DeleteExpiredHttpTokensAndPushDatas()
-
+	http.HandleFunc("/register/", RegisterHandler)
 	http.HandleFunc("/push/", PushHandler)
 	http.HandleFunc("/pool/", PoolHandler)
-	http.HandleFunc("/token/", TokenHandler)
 	if err := http.ListenAndServeTLS(httpHostPort, *certPemFile, *keyPemFile, nil); err != nil {
 		log.Fatal(err)
 	}
