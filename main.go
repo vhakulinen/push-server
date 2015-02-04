@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/vhakulinen/push-server/pushserv"
 )
@@ -46,7 +47,25 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 func PushHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	_, err := pushserv.SavePushData(r.FormValue("title"), r.FormValue("body"), r.FormValue("token"))
+	title := r.FormValue("title")
+	body := r.FormValue("body")
+	token := r.FormValue("token")
+	stimestamp := r.FormValue("timestamp")
+	if stimestamp != "" {
+		timestamp, err := strconv.ParseInt(stimestamp, 10, 64)
+		if err != nil {
+			log.Printf("Failed to parse timestamp int PushHandler() (%v)", err)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Failed to parse timestamp"))
+			return
+		}
+		_, err = pushserv.SavePushData(title, body, token, timestamp)
+		if err != nil {
+			log.Printf("Something went wrong! (%v)", err)
+		}
+		return
+	}
+	_, err := pushserv.SavePushDataMinimal(title, body, token)
 	if err != nil {
 		log.Printf("Something went wrong! (%v)", err)
 	}

@@ -18,6 +18,7 @@ func GetAllPushDatas() []*PushData {
 }
 
 // Queries db for tokens and returns one of token and key matches
+// TODO: Only take token string and query with that, dont check the key here
 func GetHttpToken(token, key string) (t *HttpToken, err error) {
 	t = new(HttpToken)
 	if db.Where("token = ?", token).First(t).RecordNotFound() {

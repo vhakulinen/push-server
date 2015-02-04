@@ -172,13 +172,34 @@ func (t *HttpToken) GetPushes() []*PushData {
 type PushData struct {
 	Id        int64
 	CreatedAt time.Time
+	DeletedAt time.Time
 
-	Title string `sql:"not null"`
-	Body  string
-	Token string `sql:"not null"`
+	UnixTimeStamp int64
+	Title         string `sql:"not null"`
+	Body          string
+	Token         string `sql:"not null"`
 }
 
-func SavePushData(title, body, token string) (p *PushData, err error) {
+func SavePushData(title, body, token string, timestamp int64) (p *PushData, err error) {
+	if timestamp < 0 {
+		return nil, fmt.Errorf("Timestamp can't be less than 0")
+	}
+	if title == "" || token == "" {
+		return nil, fmt.Errorf("token and title required")
+	}
+	p = &PushData{
+		Title:         title,
+		Body:          body,
+		Token:         token,
+		UnixTimeStamp: timestamp,
+	}
+	if err = db.Save(p).Error; err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func SavePushDataMinimal(title, body, token string) (p *PushData, err error) {
 	if title == "" || token == "" {
 		return nil, fmt.Errorf("token and title required")
 	}
