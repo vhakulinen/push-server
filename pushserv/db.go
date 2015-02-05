@@ -11,8 +11,8 @@ import (
 
 var db gorm.DB
 
-func GetAllPushDatas() []*PushData {
-	pushdatas := []*PushData{}
+func GetAllPushDatas() []PushData {
+	pushdatas := []PushData{}
 	db.Find(&pushdatas)
 	return pushdatas
 }
@@ -35,8 +35,8 @@ func GetHttpToken(token, key string) (t *HttpToken, err error) {
 	return t, nil
 }
 
-func GetAllTokens() []*HttpToken {
-	tokens := []*HttpToken{}
+func GetAllTokens() []HttpToken {
+	tokens := []HttpToken{}
 	db.Find(&tokens)
 	return tokens
 }

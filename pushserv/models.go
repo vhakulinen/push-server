@@ -159,8 +159,8 @@ func (t *HttpToken) Delete() {
 	db.Delete(t)
 }
 
-func (t *HttpToken) GetPushes() []*PushData {
-	pushes := []*PushData{}
+func (t *HttpToken) GetPushes() []PushData {
+	pushes := []PushData{}
 	db.Where("token = ?", t.Token).Find(&pushes)
 
 	for _, p := range pushes {
