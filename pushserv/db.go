@@ -3,7 +3,6 @@ package pushserv
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
@@ -19,18 +18,10 @@ func GetAllPushDatas() []PushData {
 
 // Queries db for tokens and returns one of token and key matches
 // TODO: Only take token string and query with that, dont check the key here
-func GetHttpToken(token, key string) (t *HttpToken, err error) {
+func GetHttpToken(token string) (t *HttpToken, err error) {
 	t = new(HttpToken)
 	if db.Where("token = ?", token).First(t).RecordNotFound() {
 		return nil, fmt.Errorf("Invalid key or token not found")
-	}
-	if key != t.Key {
-		return nil, fmt.Errorf("Invalid key or token not found")
-	}
-	db.Save(t)
-	t.AccessedAt = time.Now()
-	if err := db.Save(t).Error; err != nil {
-		log.Printf("Cannot save HttpToken (%v)", err)
 	}
 	return t, nil
 }

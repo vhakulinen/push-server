@@ -159,13 +159,19 @@ func (t *HttpToken) Delete() {
 	db.Delete(t)
 }
 
+// NOTE: This updates AccessedAt time!
 func (t *HttpToken) GetPushes() []PushData {
 	pushes := []PushData{}
 	db.Where("token = ?", t.Token).Find(&pushes)
 
+	// Soft delete fetched push datas
 	for _, p := range pushes {
 		db.Delete(p)
 	}
+
+	// Update the AccessedAt time
+	t.AccessedAt = time.Now()
+	t.Save()
 	return pushes
 }
 

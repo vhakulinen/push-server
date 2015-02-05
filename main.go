@@ -79,11 +79,11 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	token := r.FormValue("token")
 	key := r.FormValue("key")
-	t, err := pushserv.GetHttpToken(token, key)
+	t, err := pushserv.GetHttpToken(token)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
-	} else {
+	} else if t.Key == key {
 		data := ""
 		for _, push := range t.GetPushes() {
 			tmp, err := push.ToJson()
@@ -97,6 +97,9 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(data))
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 	}
 }
 
