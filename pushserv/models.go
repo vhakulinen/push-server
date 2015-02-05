@@ -89,7 +89,7 @@ func (u *User) ValidatePassowrd(password string) bool {
 	return false
 }
 
-func (u *User) GetHttpToken() (*HttpToken, error) {
+func (u *User) HttpToken() (*HttpToken, error) {
 	t := new(HttpToken)
 	if db.Where("id = ?", u.HttpTokenId).First(t).RecordNotFound() {
 		return nil, fmt.Errorf("Token not found")
