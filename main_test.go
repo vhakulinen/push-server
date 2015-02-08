@@ -242,7 +242,6 @@ func TestPoolHandler(t *testing.T) {
 		UnixTimeStamp int64
 		Title         string
 		Body          string
-		Token         string
 	}
 
 	for i, data := range testData {
