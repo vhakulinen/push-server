@@ -9,31 +9,30 @@ or say for your mobile (if someone creates app for it)
 
 ## Usage
 By default, all push data and pool tokens experies on 10 minutes.
+### Regsiter
+```
+curl localhost:8080/register/ -d email=<email> -d password=<password>
+```
+If registeration didnt ocour any errors, this will return your token. Do not
+lose it and keep it private, since it is what you use to send and pool
+YOUR data.
 ### Pool
-
-TODO: Update
-
-####< OUT OF DATE
-To register for pooling (receive notifies), you'll need token and key which you
-can make up on your own. Just send following request to the server with curl:
 ```
-curl localhost:8080/token/ -d token=<your_token_here> -d key=<your_key_here>
+curl localhost:8080/pool/ -d token=<your_token_here>
 ```
-Tokens are user speific and no one can pull notifies under token without
-the key. But everyone can push notifies for token, so don't spread it if you
-dont want to get shizzels on your pool clients.
-After that, do the folloing for pooling
-```
-curl localhost:8080/pool/ -d token=<your_token_here> -d key=<your_key_here>
-```
-Notice the different url path!
+This will return all pushdatas under specified token as JSON.
 ### Push
 To push notifies:
 ```
 curl localhost:8080/push/ -d token=<your_token_here> -d body=<message_body> \
 -d title=<message_title>
 ```
-####/>
+You can also add unixtimestamp with `-d timestamp=<time>`. This needs to be
+valid unix time stamp (integer).
 
 ### Server
 `-h` flag will do the trick
+
+
+## Note
+Everything except passwords are saved as plain text on the server.
