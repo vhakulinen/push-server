@@ -74,3 +74,47 @@ func TestRegisterHandler(t *testing.T) {
 		}
 	}
 }
+
+func TestPushHandler(t *testing.T) {
+	/*
+		PushHander doesnt care if the token is valid or not, so we dont check
+		the return messages because those will only contain error messages
+		to user, if even those.
+	*/
+
+	ts := httptest.NewServer(http.HandlerFunc(PushHandler))
+	defer ts.Close()
+
+	var testData = []struct {
+		title        string
+		body         string
+		token        string
+		timestamp    string
+		expectedCode int
+	}{
+		// Server doesnt notify user if the token is invalid
+		// so this takes care of invalid and valid token situations
+		{"title", "body", "invalidtoken", "", 200},
+
+		{"title", "body", "token", "invalidtimestapm", 400},
+		{"", "noTokenNorTitle", "", "", 500},
+		{"", "noTokenNorTitleWithTimeStamp", "", "100", 500},
+	}
+
+	for i, data := range testData {
+		form := url.Values{}
+		form.Add("title", data.title)
+		form.Add("body", data.body)
+		form.Add("token", data.token)
+		form.Add("timestamp", data.timestamp)
+
+		res, err := http.PostForm(ts.URL, form)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if res.StatusCode != data.expectedCode {
+			t.Errorf("Got %d, want %d (run %d)", res.StatusCode, data.expectedCode, i)
+		}
+	}
+}
