@@ -1,7 +1,6 @@
 package pushserv
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 )
 
 const (
-	DefaultGenKeySize  = 6
 	MinPasswordLength  = 6
 	PasswordSaltLength = 16
 )
@@ -106,23 +104,14 @@ type HttpToken struct {
 	UserId int64 `sql:"not null"`
 
 	Token string `sql:"not null;unique"`
-	Key   string `sql:"not null"`
 }
 
 func GenerateAndSaveToken() (*HttpToken, error) {
-	t := new(HttpToken)
 	var id string
-	var keyraw []byte
 	count := 0
 	for {
 		id = uuid.NewUUID().String()
-		keyraw = make([]byte, DefaultGenKeySize)
-		_, err := rand.Read(keyraw)
-		if err != nil {
-			log.Fatal(err)
-		}
-		key := base64.URLEncoding.EncodeToString(keyraw)
-		if t, err = RegisterHttpToken(id, key); err == nil {
+		if t, err := RegisterHttpToken(id); err == nil {
 			return t, nil
 		} else {
 			if count >= 3 {
@@ -135,12 +124,11 @@ func GenerateAndSaveToken() (*HttpToken, error) {
 }
 
 // Register token for http pooling
-func RegisterHttpToken(token, key string) (t *HttpToken, err error) {
+func RegisterHttpToken(token string) (t *HttpToken, err error) {
 	t = new(HttpToken)
 	if db.Where("token = ?", token).First(t).RecordNotFound() {
 		t = &HttpToken{
 			Token:      token,
-			Key:        key,
 			AccessedAt: time.Now(),
 		}
 		if err = db.Save(t).Error; err != nil {

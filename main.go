@@ -13,7 +13,6 @@ import (
 
 const (
 	TokenMinLength = 8
-	KeyMinLength   = 5
 )
 
 var host = flag.String("host", "localhost", "Address to bind")
@@ -42,7 +41,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("%s:%s", t.Token, t.Key)))
+	w.Write([]byte(fmt.Sprintf("%s", t.Token)))
 }
 
 func PushHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,12 +77,11 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	token := r.FormValue("token")
-	key := r.FormValue("key")
 	t, err := pushserv.GetHttpToken(token)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
-	} else if t.Key == key {
+	} else {
 		data := ""
 		for _, push := range t.GetPushes() {
 			tmp, err := push.ToJson()
@@ -97,9 +95,6 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(data))
-	} else {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 	}
 }
 

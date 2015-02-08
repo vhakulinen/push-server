@@ -10,7 +10,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +18,7 @@ import (
 
 const (
 	tokenRegexString = "[0-9a-zA-Z]{8}-[0-9a-zA-Z]{4}-[0-9a-zA-Z]{4}-" +
-		"[0-9a-zA-Z]{4}-[0-9a-zA-Z]{12}:[0-9a-zA-Z\\-\\_]{6}"
+		"[0-9a-zA-Z]{4}-[0-9a-zA-Z]{12}"
 	emailpassRequiredRegexString = "Email and password required"
 	userExistsRegexString        = "User exists"
 )
@@ -125,7 +124,6 @@ func TestPushHandler(t *testing.T) {
 
 func TestPoolHandler(t *testing.T) {
 	var pushToken string
-	var pushKey string
 	var pushTitle = "title"
 	var pushBody = "body"
 	var pushTime = time.Now().Unix()
@@ -154,10 +152,7 @@ func TestPoolHandler(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	s := strings.Split(string(body), ":")
-	pushToken = s[0]
-	pushKey = s[1]
+	pushToken = string(body)
 
 	// Push some data
 	form = url.Values{}
@@ -173,14 +168,12 @@ func TestPoolHandler(t *testing.T) {
 	// The actual testing
 	var testData = []struct {
 		token          string
-		key            string
 		expectingValid bool
 		expectedCode   int
 	}{
-		{pushToken, pushKey, true, 200},
-		{"invalidtoken", "", false, 404},
-		{pushToken, "invalidkey", false, 404},
-		{"invalid", "invalid", false, 404},
+		{pushToken, true, 200},
+		{"invalidtoken", false, 404},
+		{"invalid", false, 404},
 	}
 	type validDataStrcut struct {
 		UnixTimeStamp int64
@@ -192,7 +185,6 @@ func TestPoolHandler(t *testing.T) {
 	for i, data := range testData {
 		form = url.Values{}
 		form.Add("token", data.token)
-		form.Add("key", data.key)
 
 		res, err = http.PostForm(ts.URL, form)
 		if err != nil {

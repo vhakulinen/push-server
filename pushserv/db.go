@@ -16,12 +16,10 @@ func GetAllPushDatas() []PushData {
 	return pushdatas
 }
 
-// Queries db for tokens and returns one of token and key matches
-// TODO: Only take token string and query with that, dont check the key here
 func GetHttpToken(token string) (t *HttpToken, err error) {
 	t = new(HttpToken)
 	if db.Where("token = ?", token).First(t).RecordNotFound() {
-		return nil, fmt.Errorf("Invalid key or token not found")
+		return nil, fmt.Errorf("Token not found")
 	}
 	return t, nil
 }
