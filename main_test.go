@@ -31,6 +31,69 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+func TestRetrieveHandler(t *testing.T) {
+	var user = "retrieveuser"
+	var pass = "password"
+	var token string
+
+	ts := httptest.NewServer(http.HandlerFunc(RetrieveHandler))
+	defer ts.Close()
+
+	// Register user
+	tsregsiter := httptest.NewServer(http.HandlerFunc(RegisterHandler))
+	defer ts.Close()
+
+	form := url.Values{}
+	form.Add("email", user)
+	form.Add("password", pass)
+
+	res, err := http.PostForm(tsregsiter.URL, form)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	token = string(body)
+
+	var testData = []struct {
+		email          string
+		password       string
+		expectedCode   int
+		expectedString string
+	}{
+		{user, pass, 200, token},
+		{"invalid", "pass", 404, http.StatusText(http.StatusNotFound)},
+	}
+
+	for i, data := range testData {
+		form = url.Values{}
+		form.Add("email", data.email)
+		form.Add("password", data.password)
+
+		res, err := http.PostForm(ts.URL, form)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		body, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if res.StatusCode != data.expectedCode {
+			t.Errorf("Got %d, want %d (run %d)", res.StatusCode, data.expectedCode, i)
+		}
+		if string(body) != data.expectedString {
+			t.Errorf("Got \"%v\", want \"%s\" (run %d)", string(body), data.expectedString, i)
+		}
+	}
+}
+
 func TestRegisterHandler(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(RegisterHandler))
 	defer ts.Close()

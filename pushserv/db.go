@@ -30,6 +30,14 @@ func GetAllTokens() []HttpToken {
 	return tokens
 }
 
+func GetUser(email string) (*User, error) {
+	u := new(User)
+	if db.Where("email = ?", email).First(u).RecordNotFound() {
+		return nil, fmt.Errorf("User not found")
+	}
+	return u, nil
+}
+
 // This is just for testing purposes
 func SetupDatabase() gorm.DB {
 	var err error

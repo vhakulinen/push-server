@@ -98,6 +98,25 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	user, err := pushserv.GetUser(email)
+	if err != nil || !user.ValidatePassowrd(password) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(http.StatusText(http.StatusNotFound)))
+	} else {
+		t, err := user.HttpToken()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+		} else {
+			w.Write([]byte(t.Token))
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	httpHostPort = fmt.Sprintf("%s:%s", *host, *httpPort)
@@ -114,6 +133,7 @@ func main() {
 	http.HandleFunc("/register/", RegisterHandler)
 	http.HandleFunc("/push/", PushHandler)
 	http.HandleFunc("/pool/", PoolHandler)
+	http.HandleFunc("/retrieve/", RetrieveHandler)
 	if err := http.ListenAndServeTLS(httpHostPort, *certPemFile, *keyPemFile, nil); err != nil {
 		log.Fatal(err)
 	}
