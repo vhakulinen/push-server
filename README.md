@@ -15,6 +15,11 @@ curl localhost:8080/register/ -d email=<email> -d password=<password>
 If registeration didnt ocour any errors, this will return your token. Do not
 lose it and keep it private, since it is what you use to send and pool
 YOUR data.
+### Retrieve token
+```
+curl localhost:8080/retrieve/ -d email=<email> -d password=<password>
+```
+This will return you your token. 404 if authentication fails.
 ### Pool
 ```
 curl localhost:8080/pool/ -d token=<your_token_here>
