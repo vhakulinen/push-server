@@ -32,7 +32,8 @@ func GetAllTokens() []HttpToken {
 	return tokens
 }
 
-func init() {
+// This is just for testing purposes
+func SetupDatabase() gorm.DB {
 	var err error
 	db, err = gorm.Open("sqlite3", "db.sqlite3")
 	if err != nil {
@@ -41,4 +42,9 @@ func init() {
 	db.AutoMigrate(&PushData{})
 	db.AutoMigrate(&HttpToken{})
 	db.AutoMigrate(&User{})
+	return db
+}
+
+func init() {
+	SetupDatabase()
 }
