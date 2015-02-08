@@ -66,6 +66,7 @@ func TestRetrieveHandler(t *testing.T) {
 		expectedString string
 	}{
 		{user, pass, 200, token},
+		{user, "invalidpass", 404, http.StatusText(http.StatusNotFound)},
 		{"invalid", "pass", 404, http.StatusText(http.StatusNotFound)},
 	}
 
