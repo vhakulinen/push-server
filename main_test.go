@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -8,14 +9,17 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/vhakulinen/push-server/pushserv"
 )
 
 const (
 	tokenRegexString = "[0-9a-zA-Z]{8}-[0-9a-zA-Z]{4}-[0-9a-zA-Z]{4}-" +
-		"[0-9a-zA-Z]{4}-[0-9a-zA-Z]{12}:[0-9a-zA-Z\\-]{6}"
+		"[0-9a-zA-Z]{4}-[0-9a-zA-Z]{12}:[0-9a-zA-Z\\-\\_]{6}"
 	emailpassRequiredRegexString = "Email and password required"
 	userExistsRegexString        = "User exists"
 )
@@ -115,6 +119,110 @@ func TestPushHandler(t *testing.T) {
 
 		if res.StatusCode != data.expectedCode {
 			t.Errorf("Got %d, want %d (run %d)", res.StatusCode, data.expectedCode, i)
+		}
+	}
+}
+
+func TestPoolHandler(t *testing.T) {
+	var pushToken string
+	var pushKey string
+	var pushTitle = "title"
+	var pushBody = "body"
+	var pushTime = time.Now().Unix()
+
+	ts := httptest.NewServer(http.HandlerFunc(PoolHandler))
+	defer ts.Close()
+
+	// We need to push atleast one pushdata to be able to test the pooling
+	tspush := httptest.NewServer(http.HandlerFunc(PushHandler))
+	defer ts.Close()
+	// And we need to regsiter user for that
+	tsregsiter := httptest.NewServer(http.HandlerFunc(RegisterHandler))
+	defer ts.Close()
+
+	// Register the user
+	form := url.Values{}
+	form.Add("email", "user")
+	form.Add("password", "password")
+	res, err := http.PostForm(tsregsiter.URL, form)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	s := strings.Split(string(body), ":")
+	pushToken = s[0]
+	pushKey = s[1]
+
+	// Push some data
+	form = url.Values{}
+	form.Add("token", pushToken)
+	form.Add("title", pushTitle)
+	form.Add("body", pushBody)
+	form.Add("timestamp", strconv.FormatInt(pushTime, 10))
+	_, err = http.PostForm(tspush.URL, form)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// The actual testing
+	var testData = []struct {
+		token          string
+		key            string
+		expectingValid bool
+		expectedCode   int
+	}{
+		{pushToken, pushKey, true, 200},
+		{"invalidtoken", "", false, 404},
+		{pushToken, "invalidkey", false, 404},
+		{"invalid", "invalid", false, 404},
+	}
+	type validDataStrcut struct {
+		UnixTimeStamp int64
+		Title         string
+		Body          string
+		Token         string
+	}
+
+	for i, data := range testData {
+		form = url.Values{}
+		form.Add("token", data.token)
+		form.Add("key", data.key)
+
+		res, err = http.PostForm(ts.URL, form)
+		if err != nil {
+			log.Fatal(err)
+		}
+		body, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if res.StatusCode != data.expectedCode {
+			t.Errorf("Go %v status code, want %d (run %d)", res.StatusCode, data.expectedCode, i)
+		}
+
+		if data.expectingValid {
+			v := &validDataStrcut{}
+			err = json.Unmarshal(body, v)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if v.Body != pushBody {
+				t.Errorf("Got \"%v\" in body, want \"%s\"", v.Body, pushBody)
+			}
+			if v.Title != pushTitle {
+				t.Errorf("Got \"%v\" in title, want \"%s\"", v.Title, pushTitle)
+			}
+			if v.UnixTimeStamp != pushTime {
+				t.Errorf("Got \"%v\" in time, want \"%d\"", v.UnixTimeStamp, pushTime)
+			}
 		}
 	}
 }
