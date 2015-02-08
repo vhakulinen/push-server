@@ -164,14 +164,14 @@ func (t *HttpToken) GetPushes() []PushData {
 }
 
 type PushData struct {
-	Id        int64
-	CreatedAt time.Time
-	DeletedAt time.Time
+	Id        int64     `json:"-"`
+	CreatedAt time.Time `json:"-"`
+	DeletedAt time.Time `json:"-"`
 
 	UnixTimeStamp int64
 	Title         string `sql:"not null"`
 	Body          string
-	Token         string `sql:"not null"`
+	Token         string `sql:"not null" json:"-"`
 }
 
 func SavePushData(title, body, token string, timestamp int64) (p *PushData, err error) {
