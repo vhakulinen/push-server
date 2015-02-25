@@ -103,7 +103,7 @@ func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	user, err := pushserv.GetUser(email)
-	if err != nil || !user.ValidatePassowrd(password) {
+	if err != nil || !user.ValidatePassword(password) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 	} else {

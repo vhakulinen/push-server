@@ -75,7 +75,7 @@ func (u *User) BeforeCreate() error {
 	return nil
 }
 
-func (u *User) ValidatePassowrd(password string) bool {
+func (u *User) ValidatePassword(password string) bool {
 	hash := sha256.Sum256([]byte(password + u.Password[:PasswordSaltLength]))
 	if len(u.Password) > PasswordSaltLength+MinPasswordLength {
 		if string(hash[:]) == u.Password[PasswordSaltLength:] {
