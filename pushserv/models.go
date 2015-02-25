@@ -181,6 +181,10 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 	if title == "" || token == "" {
 		return nil, fmt.Errorf("token and title required")
 	}
+	// TODO: Check that if token exists.
+	// If the token doesnt exist, should we or should we not info the client
+	// about it? If we do, he/she could brute force this to find out other
+	// users tokens...
 	p = &PushData{
 		Title:         title,
 		Body:          body,
