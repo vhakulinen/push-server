@@ -198,18 +198,7 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 }
 
 func SavePushDataMinimal(title, body, token string) (p *PushData, err error) {
-	if title == "" || token == "" {
-		return nil, fmt.Errorf("token and title required")
-	}
-	p = &PushData{
-		Title: title,
-		Body:  body,
-		Token: token,
-	}
-	if err = db.Save(p).Error; err != nil {
-		return nil, err
-	}
-	return p, nil
+	return SavePushData(title, body, token, 0)
 }
 
 func (p *PushData) Delete() {
