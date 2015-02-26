@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -49,13 +48,13 @@ func TestRetrieveHandler(t *testing.T) {
 
 	res, err := http.PostForm(tsregsiter.URL, form)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	token = string(body)
 
@@ -77,13 +76,13 @@ func TestRetrieveHandler(t *testing.T) {
 
 		res, err := http.PostForm(ts.URL, form)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 
 		body, err := ioutil.ReadAll(res.Body)
 		res.Body.Close()
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 
 		if res.StatusCode != data.expectedCode {
@@ -120,13 +119,13 @@ func TestRegisterHandler(t *testing.T) {
 		// res, err := http.Get(ts.URL)
 		res, err := http.PostForm(ts.URL, form)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 
 		body, err := ioutil.ReadAll(res.Body)
 		res.Body.Close()
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 
 		if res.StatusCode != data.expectedCode {
@@ -134,7 +133,7 @@ func TestRegisterHandler(t *testing.T) {
 		}
 		ok, err := regexp.Match(data.expectedString, body)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 		if !ok {
 			t.Errorf("Got \"%s\", want string matching regex \"%s\" (run %d)", body, data.expectedString, i)
@@ -178,7 +177,7 @@ func TestPushHandler(t *testing.T) {
 
 		res, err := http.PostForm(ts.URL, form)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 
 		if res.StatusCode != data.expectedCode {
@@ -209,13 +208,13 @@ func TestPoolHandler(t *testing.T) {
 	form.Add("password", "password")
 	res, err := http.PostForm(tsregsiter.URL, form)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 	pushToken = string(body)
 
@@ -227,7 +226,7 @@ func TestPoolHandler(t *testing.T) {
 	form.Add("timestamp", strconv.FormatInt(pushTime, 10))
 	_, err = http.PostForm(tspush.URL, form)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	// The actual testing
@@ -252,12 +251,12 @@ func TestPoolHandler(t *testing.T) {
 
 		res, err = http.PostForm(ts.URL, form)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 		body, err := ioutil.ReadAll(res.Body)
 		res.Body.Close()
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 
 		if res.StatusCode != data.expectedCode {
@@ -268,7 +267,7 @@ func TestPoolHandler(t *testing.T) {
 			v := &validDataStrcut{}
 			err = json.Unmarshal(body, v)
 			if err != nil {
-				log.Fatal(err)
+				t.Fatal(err)
 			}
 			if v.Body != pushBody {
 				t.Errorf("Got \"%v\" in body, want \"%s\"", v.Body, pushBody)
