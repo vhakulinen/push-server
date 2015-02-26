@@ -165,8 +165,8 @@ func TestPushHandler(t *testing.T) {
 
 		{"title", "body", "token", "invalidtimestapm", 400},
 		{"title", "body", "token", "-11", 400},
-		{"", "noTokenNorTitle", "", "", 500},
-		{"", "noTokenNorTitleWithTimeStamp", "", "100", 500},
+		{"", "noTokenNorTitle", "", "", 200},
+		{"", "noTokenNorTitleWithTimeStamp", "", "100", 200},
 	}
 
 	for i, data := range testData {
