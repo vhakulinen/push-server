@@ -236,8 +236,8 @@ func TestPoolHandler(t *testing.T) {
 		expectedCode   int
 	}{
 		{pushToken, true, 200},
-		{"invalidtoken", false, 404},
-		{"invalid", false, 404},
+		{"invalidtoken", false, 200},
+		{"invalid", false, 200},
 	}
 	type validDataStrcut struct {
 		UnixTimeStamp int64
