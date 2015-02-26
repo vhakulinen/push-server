@@ -79,6 +79,7 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.FormValue("token")
 	t, err := pushserv.GetHttpToken(token)
 	if err != nil {
+		// TODO: Rethink this return message
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 	} else {
