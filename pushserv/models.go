@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"time"
 
 	"crypto/rand"
@@ -16,6 +17,8 @@ import (
 const (
 	MinPasswordLength  = 6
 	PasswordSaltLength = 16
+
+	emailRegexStr = "(\\w[-._\\w]*\\w@\\w[-._\\w]*\\w\\.\\w{2,3})"
 )
 
 type User struct {
@@ -36,6 +39,13 @@ func NewUser(email, password string) (*User, error) {
 		return nil, fmt.Errorf("Email and password required")
 	} else if len(password) < MinPasswordLength {
 		return nil, fmt.Errorf("Min. password length is %d", MinPasswordLength)
+	}
+	ok, err := regexp.Match(emailRegexStr, []byte(email))
+	if err != nil {
+		log.Printf("Failed to create regex string for email matching! (%v)", err)
+		return nil, fmt.Errorf("Invalid email address")
+	} else if ok == false {
+		return nil, fmt.Errorf("Invalid email address")
 	}
 	if db.Where("email = ?", email).First(u).RecordNotFound() {
 		token, err := GenerateAndSaveToken()

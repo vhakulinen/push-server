@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestRetrieveHandler(t *testing.T) {
-	var user = "retrieveuser"
+	var user = "retrieve@user.com"
 	var pass = "password"
 	var token string
 
@@ -105,10 +105,10 @@ func TestRegisterHandler(t *testing.T) {
 		expectedString string
 	}{
 		{"", "", 400, emailpassRequiredRegexString},
-		{"emailisnotenough", "", 400, emailpassRequiredRegexString},
+		{"email@isnot_enough.com", "", 400, emailpassRequiredRegexString},
 		{"", "passwordisnotenough", 400, emailpassRequiredRegexString},
-		{"validemail", "validpassword", 200, tokenRegexString},
-		{"validemail", "validpassword", 400, userExistsRegexString},
+		{"valid@email.com", "validpassword", 200, tokenRegexString},
+		{"valid@email.com", "validpassword", 400, userExistsRegexString},
 	}
 
 	for i, data := range testData {
@@ -204,7 +204,7 @@ func TestPoolHandler(t *testing.T) {
 
 	// Register the user
 	form := url.Values{}
-	form.Add("email", "user")
+	form.Add("email", "user@domain.com")
 	form.Add("password", "password")
 	res, err := http.PostForm(tsregsiter.URL, form)
 	if err != nil {

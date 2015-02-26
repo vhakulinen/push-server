@@ -23,8 +23,13 @@ func TestNewUser(t *testing.T) {
 		{"user@domain.com", "password123", false},
 		{"user@domain.com", "dubplicateemail", true},
 		{"invalid@password.com", "inva", true},
-		{"emptypass", "", true},
+		{"user@domain.com", "", true},
 		{"", "emptyemail", true},
+		{"invalidEmail", "password123", true},
+		{"a@co", "password123", true},
+		{"a@.io", "password123", true},
+		{"@domain.com", "password123", true},
+		{"username@", "password123", true},
 	}
 
 	// Store here and delete afterwards
