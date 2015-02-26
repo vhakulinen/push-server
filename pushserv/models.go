@@ -76,6 +76,7 @@ func (u *User) BeforeCreate() error {
 }
 
 func (u *User) ValidatePassword(password string) bool {
+	// TODO: Check that slice is not out of bounds
 	hash := sha256.Sum256([]byte(password + u.Password[:PasswordSaltLength]))
 	if len(u.Password) > PasswordSaltLength+MinPasswordLength {
 		if string(hash[:]) == u.Password[PasswordSaltLength:] {
