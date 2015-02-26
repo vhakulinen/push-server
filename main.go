@@ -57,6 +57,10 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Failed to parse timestamp"))
 			return
+		} else if timestamp < 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Timestamp can't be less than 0"))
+			return
 		}
 		_, err = pushserv.SavePushData(title, body, token, timestamp)
 		if err != nil {

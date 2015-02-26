@@ -164,6 +164,7 @@ func TestPushHandler(t *testing.T) {
 		{"title", "body", "invalidtoken", "", 200},
 
 		{"title", "body", "token", "invalidtimestapm", 400},
+		{"title", "body", "token", "-11", 400},
 		{"", "noTokenNorTitle", "", "", 500},
 		{"", "noTokenNorTitleWithTimeStamp", "", "100", 500},
 	}
