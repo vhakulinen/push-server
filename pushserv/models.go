@@ -217,7 +217,6 @@ func (p *PushData) Delete() {
 }
 
 func (p *PushData) ToJson() ([]byte, error) {
-	// TODO: Exclude everything except timestamp, title and body
 	b, err := json.Marshal(p)
 	if err != nil {
 		return nil, err
