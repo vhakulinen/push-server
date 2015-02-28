@@ -35,7 +35,7 @@ You can also add unixtimestamp with `-d timestamp=<time>`. This needs to be
 valid unix time stamp (integer).
 
 ### Server
-`-h` flag will do the trick
+Copy the push-serv.conf.def file to push-serv.conf or add the path with -config flag
 
 
 ## Note

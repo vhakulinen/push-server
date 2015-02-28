@@ -8,15 +8,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/vhakulinen/push-server/config"
 	"github.com/vhakulinen/push-server/pushserv"
 )
 
-var host = flag.String("host", "localhost", "Address to bind")
-var httpPort = flag.String("httpport", "8080", "Port to bind for pushing and http pooling")
-var logFile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
-var logToTty = flag.Bool("logtty", false, "Output log to tty")
-var certPemFile = flag.String("cert", "cert.pem", "Certificate pem file")
-var keyPemFile = flag.String("key", "key.pem", "Key pem file")
+var configFile = flag.String("config", "push-serv.conf", "Path to config file")
 
 var httpHostPort string
 
@@ -111,10 +107,23 @@ func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
-	httpHostPort = fmt.Sprintf("%s:%s", *host, *httpPort)
+	config.GetConfig(*configFile)
 
-	if !*logToTty {
-		f, err := os.OpenFile(*logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logToTty, err := config.Config.Bool("log", "totty")
+	logFile, err := config.Config.String("log", "file")
+	host, err := config.Config.String("default", "host")
+	port, err := config.Config.Int("default", "port")
+	certPemFile, err := config.Config.String("ssl", "certpath")
+	keyPemFile, err := config.Config.String("ssl", "keypath")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	httpHostPort = fmt.Sprintf("%s:%d", host, port)
+
+	if !logToTty {
+		f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			log.Fatalf("error opening file: %v", err)
 		}
@@ -126,7 +135,8 @@ func main() {
 	http.HandleFunc("/push/", PushHandler)
 	http.HandleFunc("/pool/", PoolHandler)
 	http.HandleFunc("/retrieve/", RetrieveHandler)
-	if err := http.ListenAndServeTLS(httpHostPort, *certPemFile, *keyPemFile, nil); err != nil {
+
+	if err := http.ListenAndServeTLS(httpHostPort, certPemFile, keyPemFile, nil); err != nil {
 		log.Fatal(err)
 	}
 }

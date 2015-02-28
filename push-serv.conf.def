@@ -1,0 +1,11 @@
+[default]
+host=localhost
+port=8080
+
+[log]
+file=log
+totty=false
+
+[ssl]
+certpath=cert.pem
+keypath=key.pem
