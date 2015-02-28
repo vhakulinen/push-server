@@ -11,10 +11,6 @@ import (
 	"github.com/vhakulinen/push-server/pushserv"
 )
 
-const (
-	TokenMinLength = 8
-)
-
 var host = flag.String("host", "localhost", "Address to bind")
 var httpPort = flag.String("httpport", "8080", "Port to bind for pushing and http pooling")
 var logFile = flag.String("logfile", "/var/log/push-server.log", "File to save log data")
