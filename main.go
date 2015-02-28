@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/vhakulinen/push-server/config"
-	"github.com/vhakulinen/push-server/pushserv"
+	"github.com/vhakulinen/push-server/db"
 )
 
 var configFile = flag.String("config", "push-serv.conf", "Path to config file")
@@ -20,7 +20,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	email := r.FormValue("email")
 	password := r.FormValue("password")
-	user, err := pushserv.NewUser(email, password)
+	user, err := db.NewUser(email, password)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf("%v", err)))
@@ -54,12 +54,12 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Timestamp can't be less than 0"))
 			return
 		}
-		_, err = pushserv.SavePushData(title, body, token, timestamp)
+		_, err = db.SavePushData(title, body, token, timestamp)
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 		}
 	} else {
-		_, err := pushserv.SavePushDataMinimal(title, body, token)
+		_, err := db.SavePushDataMinimal(title, body, token)
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 		}
@@ -70,7 +70,7 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	data := ""
 	token := r.FormValue("token")
-	t, err := pushserv.GetHttpToken(token)
+	t, err := db.GetHttpToken(token)
 	if err == nil {
 		for _, push := range t.GetPushes() {
 			tmp, err := push.ToJson()
@@ -90,7 +90,7 @@ func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	email := r.FormValue("email")
 	password := r.FormValue("password")
-	user, err := pushserv.GetUser(email)
+	user, err := db.GetUser(email)
 	if err != nil || !user.ValidatePassword(password) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))

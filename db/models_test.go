@@ -1,4 +1,4 @@
-package pushserv
+package db
 
 import (
 	"encoding/json"

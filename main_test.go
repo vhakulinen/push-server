@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vhakulinen/push-server/pushserv"
+	"github.com/vhakulinen/push-server/db"
 )
 
 const (
@@ -24,7 +24,7 @@ const (
 
 func TestMain(m *testing.M) {
 	os.Rename("db.sqlite3", "db.sqlite3.backup")
-	pushserv.SetupDatabase()
+	db.SetupDatabase()
 	code := m.Run()
 	os.Rename("db.sqlite3.backup", "db.sqlite3")
 	os.Exit(code)
