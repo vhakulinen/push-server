@@ -205,6 +205,38 @@ func TestRegisterHandler(t *testing.T) {
 	if !emailDone {
 		t.Error("email.SendRegistrationEmail was not called!")
 	}
+
+	// Test the skipEmailVerification = true
+	//config.Config.AddOption("registration", "skipEmailVerification", "true")
+	skipEmailVerification = true // Simulate the above
+	semail := "skip@activation.com"
+	form := url.Values{}
+	form.Add("email", semail)
+	form.Add("password", "password123")
+
+	res, err := http.PostForm(ts.URL, form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, err := regexp.Match(tokenRegexString, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Errorf("Got \"%s\", want string matching regex \"%s\"", body, tokenRegexString)
+	}
+
+	// Check the user.Active state
+	user, err := db.GetUser(semail)
+	if user.Active != true {
+		t.Errorf("User.Active should be true since skipEmailVerification option was set to true in configuration!")
+	}
+	skipEmailVerification = false // Reset
 }
 
 func TestPushHandler(t *testing.T) {

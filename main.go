@@ -16,6 +16,7 @@ import (
 var configFile = flag.String("config", "push-serv.conf", "Path to config file")
 
 var httpHostPort string
+var skipEmailVerification bool
 
 func ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var writeBadRequest = func() {
@@ -53,9 +54,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf("%v", err)))
 		return
 	}
-	email.SendRegistrationEmail(user)
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Activation link was sent by email"))
+	if skipEmailVerification {
+		user.Activate()
+		token, _ := user.HttpToken()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(token.Token))
+	} else {
+		email.SendRegistrationEmail(user)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Activation link was sent by email"))
+	}
 }
 
 func PushHandler(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +145,7 @@ func main() {
 	port, err := config.Config.Int("default", "port")
 	certPemFile, err := config.Config.String("ssl", "certpath")
 	keyPemFile, err := config.Config.String("ssl", "keypath")
+	skipEmailVerification, err = config.Config.Bool("registration", "skipEmailVerification")
 
 	if err != nil {
 		log.Fatal(err)
