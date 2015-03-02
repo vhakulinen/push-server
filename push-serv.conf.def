@@ -1,6 +1,8 @@
 [default]
 host=localhost
 port=8080
+; domain will be used in email messages
+domain=sub.domain.tld
 
 [log]
 file=log
@@ -9,3 +11,10 @@ totty=false
 [ssl]
 certpath=cert.pem
 keypath=key.pem
+
+[smtp]
+host=localhost
+port=25
+username=username
+password=password
+from=from@who.com

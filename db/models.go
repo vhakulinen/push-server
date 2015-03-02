@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/vhakulinen/push-server/utils"
+
 	"crypto/rand"
 	"crypto/sha256"
 
@@ -15,8 +17,9 @@ import (
 )
 
 const (
-	MinPasswordLength  = 6
-	PasswordSaltLength = 16
+	MinPasswordLength   = 6
+	PasswordSaltLength  = 16
+	activateTokenLength = 6
 
 	emailRegexStr = "(\\w[-._\\w]*\\w@\\w[-._\\w]*\\w\\.\\w{2,3})"
 )
@@ -26,6 +29,9 @@ type User struct {
 	CreatedAt  time.Time
 	ModifiedAt time.Time
 	DeletedAt  time.Time
+
+	Active        bool
+	ActivateToken string
 
 	Email       string `sql:"not null;unique"`
 	Password    string
@@ -70,6 +76,7 @@ func NewUser(email, password string) (*User, error) {
 }
 
 func (u *User) BeforeCreate() error {
+	// Password hashing and salting
 	bsalt := make([]byte, PasswordSaltLength)
 	if len(u.Password) < MinPasswordLength {
 		return errors.New("Password is too short")
@@ -82,7 +89,16 @@ func (u *User) BeforeCreate() error {
 	salt := string(bsalt)
 	b := sha256.Sum256([]byte(u.Password + salt))
 	u.Password = salt + string(b[:])
+
+	// Activate token
+	u.ActivateToken = utils.RandomString(activateTokenLength)
+
 	return nil
+}
+
+func (u *User) Activate() {
+	u.Active = true
+	db.Save(u)
 }
 
 func (u *User) ValidatePassword(password string) bool {

@@ -10,30 +10,52 @@ import (
 
 	"github.com/vhakulinen/push-server/config"
 	"github.com/vhakulinen/push-server/db"
+	"github.com/vhakulinen/push-server/email"
 )
 
 var configFile = flag.String("config", "push-serv.conf", "Path to config file")
 
 var httpHostPort string
 
+func ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
+	var writeBadRequest = func() {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(http.StatusText(http.StatusBadRequest)))
+	}
+	defer r.Body.Close()
+	err := r.ParseForm()
+	if err != nil {
+		writeBadRequest()
+		return
+	}
+	semail := r.Form.Get("email")
+	key := r.Form.Get("key")
+	if semail == "" || key == "" {
+		writeBadRequest()
+		return
+	}
+	user, err := db.GetUser(semail)
+	if err != nil || user.Active == true || user.ActivateToken != key {
+		writeBadRequest()
+		return
+	}
+	user.Activate()
+	w.Write([]byte(http.StatusText(http.StatusOK)))
+}
+
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	email := r.FormValue("email")
+	semail := r.FormValue("email")
 	password := r.FormValue("password")
-	user, err := db.NewUser(email, password)
+	user, err := db.NewUser(semail, password)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf("%v", err)))
 		return
 	}
-	t, err := user.HttpToken()
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf("%v", err)))
-		return
-	}
+	email.SendRegistrationEmail(user)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("%s", t.Token)))
+	w.Write([]byte("Activation link was sent by email"))
 }
 
 func PushHandler(w http.ResponseWriter, r *http.Request) {
@@ -88,10 +110,10 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 
 func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	email := r.FormValue("email")
+	semail := r.FormValue("email")
 	password := r.FormValue("password")
-	user, err := db.GetUser(email)
-	if err != nil || !user.ValidatePassword(password) {
+	user, err := db.GetUser(semail)
+	if err != nil || !user.ValidatePassword(password) || !user.Active {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 	} else {
@@ -132,6 +154,7 @@ func main() {
 	}
 
 	http.HandleFunc("/register/", RegisterHandler)
+	http.HandleFunc("/activate/", ActivateUserHandler)
 	http.HandleFunc("/push/", PushHandler)
 	http.HandleFunc("/pool/", PoolHandler)
 	http.HandleFunc("/retrieve/", RetrieveHandler)

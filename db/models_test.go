@@ -54,6 +54,9 @@ func TestNewUser(t *testing.T) {
 		if u.Password == data.Password {
 			t.Errorf("Password isn't hashed!")
 		}
+		if u.Active != false {
+			t.Error("Active field should default to false!")
+		}
 	}
 
 	// Cleanup

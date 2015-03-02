@@ -2,17 +2,19 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"testing"
 	"time"
 
+	"github.com/vhakulinen/push-server/config"
 	"github.com/vhakulinen/push-server/db"
+	"github.com/vhakulinen/push-server/email"
 )
 
 const (
@@ -24,39 +26,35 @@ const (
 
 func TestMain(m *testing.M) {
 	os.Rename("db.sqlite3", "db.sqlite3.backup")
+
+	config.GetConfig("push-serv.conf.def")
 	db.SetupDatabase()
+
+	// General mock for this function
+	email.SendRegistrationEmail = func(u *db.User) error { return nil }
+
 	code := m.Run()
 	os.Rename("db.sqlite3.backup", "db.sqlite3")
 	os.Exit(code)
 }
 
 func TestRetrieveHandler(t *testing.T) {
-	var user = "retrieve@user.com"
+	var email = "retrieve@user.com"
 	var pass = "password"
 	var token string
 
 	ts := httptest.NewServer(http.HandlerFunc(RetrieveHandler))
 	defer ts.Close()
 
-	// Register user
-	tsregsiter := httptest.NewServer(http.HandlerFunc(RegisterHandler))
-	defer ts.Close()
-
-	form := url.Values{}
-	form.Add("email", user)
-	form.Add("password", pass)
-
-	res, err := http.PostForm(tsregsiter.URL, form)
+	// Add new user
+	user, err := db.NewUser(email, pass)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to add user! (%v)", err)
 	}
+	user.Activate()
 
-	body, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	token = string(body)
+	tk, _ := user.HttpToken()
+	token = tk.Token
 
 	var testData = []struct {
 		email          string
@@ -64,13 +62,13 @@ func TestRetrieveHandler(t *testing.T) {
 		expectedCode   int
 		expectedString string
 	}{
-		{user, pass, 200, token},
-		{user, "invalidpass", 404, http.StatusText(http.StatusNotFound)},
+		{email, pass, 200, token},
+		{email, "invalidpass", 404, http.StatusText(http.StatusNotFound)},
 		{"invalid", "pass", 404, http.StatusText(http.StatusNotFound)},
 	}
 
 	for i, data := range testData {
-		form = url.Values{}
+		form := url.Values{}
 		form.Add("email", data.email)
 		form.Add("password", data.password)
 
@@ -94,9 +92,73 @@ func TestRetrieveHandler(t *testing.T) {
 	}
 }
 
+func TestActivateUserHandler(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(ActivateUserHandler))
+	defer ts.Close()
+
+	// Register the user
+	email := "activateuser@domain.com"
+
+	user, err := db.NewUser(email, "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var testData = []struct {
+		Email        string
+		Key          string
+		ExpectedCode int
+	}{
+		{user.Email, "foo", 400},
+		{"fail@domain.com", user.ActivateToken, 400},
+		{user.Email, user.ActivateToken, 200},
+	}
+
+	for _, data := range testData {
+		res, err := http.Get(fmt.Sprintf("%s?email=%s&key=%s", ts.URL, data.Email, data.Key))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if data.ExpectedCode != res.StatusCode {
+			t.Errorf("Expected %v, got %v instead", data.ExpectedCode, res.StatusCode)
+		}
+	}
+	user, err = db.GetUser(email)
+	if err != nil {
+		t.Fatalf("Failed to get user with GetUser(%v)", email)
+	}
+	if user.Active == false {
+		t.Error("User.Active == false after activation!")
+	}
+	res, _ := http.Get(fmt.Sprintf("%s/", ts.URL))
+	if res.StatusCode != 400 {
+		t.Error("URI with no email or key should have returned 400")
+	}
+	res, _ = http.Get(fmt.Sprintf("%s/asd/", ts.URL))
+	if res.StatusCode != 400 {
+		t.Error("URI with ivalid data should have returned 400")
+	}
+}
+
 func TestRegisterHandler(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(RegisterHandler))
 	defer ts.Close()
+
+	emailDone := false
+	// Mock for this test
+	// NOTE: We'll are only waiting for one valid email address
+	email.SendRegistrationEmail = func(u *db.User) error {
+		if u.Active != false {
+			t.Error("User.Active should be false!")
+		}
+		expecting := "valid@email.com"
+		if u.Email != expecting {
+			t.Errorf("Expected %v, got %v instead", expecting, u.Email)
+		} else {
+			emailDone = true
+		}
+		return nil
+	}
 
 	var testData = []struct {
 		email          string
@@ -107,7 +169,7 @@ func TestRegisterHandler(t *testing.T) {
 		{"", "", 400, emailpassRequiredRegexString},
 		{"email@isnot_enough.com", "", 400, emailpassRequiredRegexString},
 		{"", "passwordisnotenough", 400, emailpassRequiredRegexString},
-		{"valid@email.com", "validpassword", 200, tokenRegexString},
+		{"valid@email.com", "validpassword", 200, "Activation link was sent by email"},
 		{"valid@email.com", "validpassword", 400, userExistsRegexString},
 	}
 
@@ -116,7 +178,6 @@ func TestRegisterHandler(t *testing.T) {
 		form.Add("email", data.email)
 		form.Add("password", data.password)
 
-		// res, err := http.Get(ts.URL)
 		res, err := http.PostForm(ts.URL, form)
 		if err != nil {
 			t.Fatal(err)
@@ -138,6 +199,11 @@ func TestRegisterHandler(t *testing.T) {
 		if !ok {
 			t.Errorf("Got \"%s\", want string matching regex \"%s\" (run %d)", body, data.expectedString, i)
 		}
+	}
+
+	// Check that SendRegistrationEmail was ran
+	if !emailDone {
+		t.Error("email.SendRegistrationEmail was not called!")
 	}
 }
 
@@ -195,36 +261,16 @@ func TestPoolHandler(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(PoolHandler))
 	defer ts.Close()
 
-	// We need to push atleast one pushdata to be able to test the pooling
-	tspush := httptest.NewServer(http.HandlerFunc(PushHandler))
-	defer ts.Close()
-	// And we need to regsiter user for that
-	tsregsiter := httptest.NewServer(http.HandlerFunc(RegisterHandler))
-	defer ts.Close()
-
-	// Register the user
-	form := url.Values{}
-	form.Add("email", "user@domain.com")
-	form.Add("password", "password")
-	res, err := http.PostForm(tsregsiter.URL, form)
+	// Add user
+	user, err := db.NewUser("pooluser@domain.com", "password")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to create user! (%v)", err)
 	}
+	token, _ := user.HttpToken()
+	pushToken = token.Token
 
-	body, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	pushToken = string(body)
-
-	// Push some data
-	form = url.Values{}
-	form.Add("token", pushToken)
-	form.Add("title", pushTitle)
-	form.Add("body", pushBody)
-	form.Add("timestamp", strconv.FormatInt(pushTime, 10))
-	_, err = http.PostForm(tspush.URL, form)
+	// Add push data
+	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushTime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,10 +292,10 @@ func TestPoolHandler(t *testing.T) {
 	}
 
 	for i, data := range testData {
-		form = url.Values{}
+		form := url.Values{}
 		form.Add("token", data.token)
 
-		res, err = http.PostForm(ts.URL, form)
+		res, err := http.PostForm(ts.URL, form)
 		if err != nil {
 			t.Fatal(err)
 		}
