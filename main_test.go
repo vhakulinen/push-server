@@ -15,6 +15,7 @@ import (
 	"github.com/vhakulinen/push-server/config"
 	"github.com/vhakulinen/push-server/db"
 	"github.com/vhakulinen/push-server/email"
+	"github.com/vhakulinen/push-server/utils"
 )
 
 const (
@@ -30,8 +31,9 @@ func TestMain(m *testing.M) {
 	config.GetConfig("push-serv.conf.def")
 	db.SetupDatabase()
 
-	// General mock for this function
+	// General mock for these functions
 	email.SendRegistrationEmail = func(u *db.User) error { return nil }
+	utils.SendGcmPing = func(regIds []string) { return }
 
 	code := m.Run()
 	os.Rename("db.sqlite3.backup", "db.sqlite3")
@@ -282,6 +284,49 @@ func TestPushHandler(t *testing.T) {
 			t.Errorf("Got %d, want %d (run %d)", res.StatusCode, data.expectedCode, i)
 		}
 	}
+
+	count := 0
+	id1 := false
+	id2 := false
+	utils.SendGcmPing = func(regIds []string) {
+		for _, id := range regIds {
+			switch id {
+			case "id1":
+				id1 = true
+				break
+			case "id2":
+				id2 = true
+				break
+			default:
+				t.Errorf("Got unexpected ID in utils.SendGcmPing (%v)", id)
+				break
+			}
+		}
+		count++
+	}
+
+	to, _ := db.GenerateAndSaveToken()
+
+	db.RegisterGCMClient("id1", to.Token)
+	db.RegisterGCMClient("id2", to.Token)
+
+	form := url.Values{}
+	form.Add("title", "title")
+	form.Add("body", "body")
+	form.Add("token", to.Token)
+	form.Add("timestamp", "0")
+
+	_, err := http.PostForm(ts.URL, form)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if count != 1 {
+		t.Errorf("utils.SendGcmPing was not called!")
+	}
+	if !id1 || !id2 {
+		t.Errorf("utils.SendGcmPing was called with invalid IDs!")
+	}
 }
 
 func TestPoolHandler(t *testing.T) {
@@ -356,6 +401,44 @@ func TestPoolHandler(t *testing.T) {
 			if v.UnixTimeStamp != pushTime {
 				t.Errorf("Got \"%v\" in time, want \"%d\"", v.UnixTimeStamp, pushTime)
 			}
+		}
+	}
+}
+
+func TestGCMRegisterHandler(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(GCMRegisterHandler))
+	defer ts.Close()
+
+	token, err := db.GenerateAndSaveToken()
+	if err != nil {
+		t.Fatalf("Failed to create new HttpToken (%v)", err)
+	}
+
+	var testData = []struct {
+		token        string
+		gcmid        string
+		expectedCode int
+	}{
+		{"", "", 400},
+		{token.Token, "gcmid", 200},
+		{token.Token, "gcmid", 500}, // Dublicated token
+		{token.Token, "gcmid2", 200},
+		{"footoken", "foobar", 500}, // invalid token
+	}
+
+	for _, data := range testData {
+		form := url.Values{}
+		form.Add("token", data.token)
+		form.Add("gcmid", data.gcmid)
+
+		res, err := http.PostForm(ts.URL, form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+
+		if res.StatusCode != data.expectedCode {
+			t.Errorf("Expected %v but got %v instead!", data.expectedCode, res.StatusCode)
 		}
 	}
 }

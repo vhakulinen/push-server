@@ -130,7 +130,8 @@ type HttpToken struct {
 
 	UserId int64 `sql:"not null"`
 
-	Token string `sql:"not null;unique"`
+	Token      string `sql:"not null;unique"`
+	GCMClients []GCMClient
 }
 
 func GenerateAndSaveToken() (*HttpToken, error) {
@@ -190,6 +191,12 @@ func (t *HttpToken) GetPushes() []PushData {
 	return pushes
 }
 
+func (t *HttpToken) GetGCMClients() []GCMClient {
+	gcmClients := []GCMClient{}
+	db.Where("token = ?", t.Token).Find(&gcmClients)
+	return gcmClients
+}
+
 type PushData struct {
 	Id        int64     `json:"-"`
 	CreatedAt time.Time `json:"-"`
@@ -208,10 +215,13 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 	if title == "" || token == "" {
 		return nil, fmt.Errorf("token and title required")
 	}
-	// TODO: Check that if token exists.
-	// If the token doesnt exist, should we or should we not info the client
-	// about it? If we do, he/she could brute force this to find out other
-	// users tokens...
+
+	// Check that token exists
+	_, err = GetHttpToken(token)
+	if err != nil {
+		return nil, err
+	}
+
 	p = &PushData{
 		Title:         title,
 		Body:          body,
@@ -219,6 +229,7 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 		UnixTimeStamp: timestamp,
 	}
 	if err = db.Save(p).Error; err != nil {
+		fmt.Printf("%v", err)
 		return nil, err
 	}
 	return p, nil
@@ -238,4 +249,42 @@ func (p *PushData) ToJson() ([]byte, error) {
 		return nil, err
 	}
 	return b, nil
+}
+
+type GCMClient struct {
+	Id         int64
+	CreatedAt  time.Time
+	ModifiedAt time.Time
+	DeletedAt  time.Time
+
+	GCMId string `sql:"not null;unique" gorm:"column:gcm_id"`
+	Token string `sql:"not null"`
+}
+
+func RegisterGCMClient(gcmId, token string) (*GCMClient, error) {
+	t := new(HttpToken)
+	if db.Where("token = ?", token).First(t).RecordNotFound() {
+		return nil, fmt.Errorf("Token not found")
+	}
+	g := new(GCMClient)
+	if db.Where("gcm_id = ?", gcmId).First(g).RecordNotFound() {
+		g = &GCMClient{
+			GCMId: gcmId,
+			Token: token,
+		}
+		g.Save()
+		t.GCMClients = append(t.GCMClients, *g)
+		t.Save()
+		return g, nil
+	} else {
+		return nil, fmt.Errorf("GCMClient id already registered")
+	}
+}
+
+func (g GCMClient) TableName() string {
+	return "gcm_clients"
+}
+
+func (g *GCMClient) Save() {
+	db.Save(g)
 }

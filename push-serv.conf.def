@@ -21,3 +21,6 @@ from=from@who.com
 
 [registration]
 skipEmailVerification=false
+
+[gcm]
+ApiKey=your_api_key

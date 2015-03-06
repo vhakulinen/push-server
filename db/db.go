@@ -48,6 +48,7 @@ func SetupDatabase() gorm.DB {
 	db.AutoMigrate(&PushData{})
 	db.AutoMigrate(&HttpToken{})
 	db.AutoMigrate(&User{})
+	db.AutoMigrate(&GCMClient{})
 	return db
 }
 

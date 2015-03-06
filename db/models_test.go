@@ -120,6 +120,7 @@ func TestSavePushData(t *testing.T) {
 		{"", "bod", token.Token, 0, true},          // No title
 		{"title", "body", "", 0, true},             // To token
 		{"title", "body", token.Token, 123, false}, // Everything is good
+		{"there is no", "valid token", "invalidtoken", 0, true},
 	}
 
 	for _, data := range testData {
@@ -129,6 +130,8 @@ func TestSavePushData(t *testing.T) {
 				t.Errorf("Got error while not expecting one! (%v)", err)
 			}
 			continue
+		} else if data.ExpectingErr {
+			t.Errorf("Was expecting error and didn't get any")
 		}
 		if pushData.Title != data.Title {
 			t.Errorf("Titles didn't match! (%v != %v)", data.Title, pushData.Title)
@@ -158,13 +161,15 @@ func TestToJson(t *testing.T) {
 		UnixTimeStamp int64
 	}
 
-	token, err := SavePushData(title, body, "token", time)
+	token, _ := GenerateAndSaveToken()
+
+	pushdata, err := SavePushData(title, body, token.Token, time)
 	if err != nil {
 		t.Fatalf("Failed to create push data! (%v)", err)
 	}
-	defer db.Unscoped().Delete(token)
+	defer db.Unscoped().Delete(pushdata)
 
-	b, err := token.ToJson()
+	b, err := pushdata.ToJson()
 	v := &pushData{}
 	err = json.Unmarshal(b, v)
 	if err != nil {
@@ -180,5 +185,5 @@ func TestToJson(t *testing.T) {
 		t.Errorf("Timestamps didn't match! (%v != %v)", time, v.UnixTimeStamp)
 	}
 
-	db.Unscoped().Delete(token)
+	db.Unscoped().Delete(pushdata)
 }

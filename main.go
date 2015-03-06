@@ -11,6 +11,7 @@ import (
 	"github.com/vhakulinen/push-server/config"
 	"github.com/vhakulinen/push-server/db"
 	"github.com/vhakulinen/push-server/email"
+	"github.com/vhakulinen/push-server/utils"
 )
 
 var configFile = flag.String("config", "push-serv.conf", "Path to config file")
@@ -87,12 +88,30 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 		_, err = db.SavePushData(title, body, token, timestamp)
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
+			return
 		}
 	} else {
 		_, err := db.SavePushDataMinimal(title, body, token)
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
+			return
 		}
+	}
+
+	// If we made it here, push data was saved so lets notify GCM clients about that
+	t, err := db.GetHttpToken(token)
+	if err != nil {
+		return
+	}
+
+	var regIds []string
+	for _, c := range t.GetGCMClients() {
+		regIds = append(regIds, c.GCMId)
+	}
+
+	// If we dont have any GCM clients, don't even try to send data to them
+	if len(regIds) > 0 {
+		go utils.SendGcmPing(regIds)
 	}
 }
 
@@ -135,6 +154,25 @@ func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func GCMRegisterHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	token := r.FormValue("token")
+	gcmId := r.FormValue("gcmid")
+	if gcmId == "" || token == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(http.StatusText(http.StatusBadRequest)))
+	} else {
+		_, err := db.RegisterGCMClient(gcmId, token)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(http.StatusText(http.StatusOK)))
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	config.GetConfig(*configFile)
@@ -167,6 +205,7 @@ func main() {
 	http.HandleFunc("/push/", PushHandler)
 	http.HandleFunc("/pool/", PoolHandler)
 	http.HandleFunc("/retrieve/", RetrieveHandler)
+	http.HandleFunc("/gcm/", GCMRegisterHandler)
 
 	if err := http.ListenAndServeTLS(httpHostPort, certPemFile, keyPemFile, nil); err != nil {
 		log.Fatal(err)
