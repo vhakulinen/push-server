@@ -21,6 +21,8 @@ var SendGcmPing = func(regIds []string) {
 
 	gcmData := map[string]interface{}{"message": "ping"}
 	msg := gcm.NewMessage(gcmData, regIds...)
+	msg.CollapseKey = "ping"
+	msg.DelayWhileIdle = false
 
 	_, err := gcmSender.Send(msg, RETRY_COUNT)
 	if err != nil {
