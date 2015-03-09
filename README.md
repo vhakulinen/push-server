@@ -12,9 +12,8 @@ or say for your mobile (if someone creates app for it)
 ```
 curl localhost:8080/register/ -d email=<email> -d password=<password>
 ```
-If registeration didnt ocour any errors, this will return your token. Do not
-lose it and keep it private, since it is what you use to send and pool
-YOUR data.
+If registeration didnt ocour any errors, this will return your token or say
+to check your email if email verification is enabled.
 ### Retrieve token
 ```
 curl localhost:8080/retrieve/ -d email=<email> -d password=<password>
