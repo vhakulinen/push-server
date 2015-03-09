@@ -105,7 +105,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var regIds []string
-	for _, c := range t.GetGCMClients() {
+	for _, c := range t.GCMClients {
 		regIds = append(regIds, c.GCMId)
 	}
 

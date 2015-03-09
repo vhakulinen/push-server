@@ -410,6 +410,7 @@ func TestGCMRegisterHandler(t *testing.T) {
 	defer ts.Close()
 
 	token, err := db.GenerateAndSaveToken()
+	token2, err := db.GenerateAndSaveToken()
 	if err != nil {
 		t.Fatalf("Failed to create new HttpToken (%v)", err)
 	}
@@ -421,7 +422,8 @@ func TestGCMRegisterHandler(t *testing.T) {
 	}{
 		{"", "", 400},
 		{token.Token, "gcmid", 200},
-		{token.Token, "gcmid", 500}, // Dublicated token
+		{token.Token, "gcmid", 200},  // Same token, should just pass
+		{token2.Token, "gcmid", 200}, // Update the token
 		{token.Token, "gcmid2", 200},
 		{"footoken", "foobar", 500}, // invalid token
 	}

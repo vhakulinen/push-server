@@ -191,10 +191,10 @@ func (t *HttpToken) GetPushes() []PushData {
 	return pushes
 }
 
-func (t *HttpToken) GetGCMClients() []GCMClient {
+func (t *HttpToken) AfterFind() {
 	gcmClients := []GCMClient{}
 	db.Where("token = ?", t.Token).Find(&gcmClients)
-	return gcmClients
+	t.GCMClients = gcmClients
 }
 
 type PushData struct {
@@ -268,6 +268,7 @@ func RegisterGCMClient(gcmId, token string) (*GCMClient, error) {
 	}
 	g := new(GCMClient)
 	if db.Where("gcm_id = ?", gcmId).First(g).RecordNotFound() {
+		// If the client doesnt exist, create it
 		g = &GCMClient{
 			GCMId: gcmId,
 			Token: token,
@@ -276,8 +277,31 @@ func RegisterGCMClient(gcmId, token string) (*GCMClient, error) {
 		t.GCMClients = append(t.GCMClients, *g)
 		t.Save()
 		return g, nil
+	} else if g.Token == t.Token {
+		// Same token as before, so let it be
+		return nil, nil
 	} else {
-		return nil, fmt.Errorf("GCMClient id already registered")
+		// If the client has already registered, update the token
+		// But before that, delete the GCMClient from the old token's client list
+		oldt := new(HttpToken)
+		if !db.Where("token = ?", g.Token).First(oldt).RecordNotFound() {
+			var pos = -1
+			for i, client := range oldt.GCMClients {
+				if client.GCMId == g.GCMId {
+					pos = i
+					break
+				}
+			}
+			if pos != -1 {
+				oldt.GCMClients = append(oldt.GCMClients[:pos], oldt.GCMClients[pos+1:]...)
+				oldt.Save()
+			}
+		}
+		g.Token = token
+		g.Save()
+		t.GCMClients = append(t.GCMClients, *g)
+		t.Save()
+		return g, nil
 	}
 }
 
