@@ -26,17 +26,16 @@ const (
 )
 
 func TestMain(m *testing.M) {
-	os.Rename("db.sqlite3", "db.sqlite3.backup")
-
 	config.GetConfig("push-serv.conf.def")
 	db.SetupDatabase()
+	db.BackupForTesting()
 
 	// General mock for these functions
 	email.SendRegistrationEmail = func(u *db.User) error { return nil }
 	utils.SendGcmPing = func(regIds []string) { return }
 
 	code := m.Run()
-	os.Rename("db.sqlite3.backup", "db.sqlite3")
+	db.RestoreFromTesting()
 	os.Exit(code)
 }
 

@@ -8,6 +8,22 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// For testing
+const (
+	userTableTemp   = "user_temp"
+	pushTableTemp   = "push_temp"
+	tokenTableTemp  = "token_temp"
+	clientTableTemp = "client_temp"
+)
+
+// For testing
+var (
+	restoreUser   = false
+	restorePush   = false
+	restoreToken  = false
+	restoreClient = false
+)
+
 var db gorm.DB
 
 func GetAllPushDatas() []PushData {
@@ -50,6 +66,56 @@ func SetupDatabase() gorm.DB {
 	db.AutoMigrate(&User{})
 	db.AutoMigrate(&GCMClient{})
 	return db
+}
+
+func BackupForTesting() {
+	if ok := db.HasTable(&User{}); ok {
+		restoreUser = true
+		renameTable("users", userTableTemp)
+		db.CreateTable(&User{})
+	}
+	if ok := db.HasTable(&HttpToken{}); ok {
+		restoreToken = true
+		renameTable("http_tokens", tokenTableTemp)
+		db.CreateTable(&HttpToken{})
+	}
+	if ok := db.HasTable(&PushData{}); ok {
+		restorePush = true
+		renameTable("push_datas", pushTableTemp)
+		db.CreateTable(&PushData{})
+	}
+	if ok := db.HasTable(&GCMClient{}); ok {
+		restoreClient = true
+		renameTable("gcm_clients", clientTableTemp)
+		db.CreateTable(&GCMClient{})
+	}
+}
+
+func RestoreFromTesting() {
+	if restoreUser {
+		dropTable("users")
+		renameTable(userTableTemp, "users")
+	}
+	if restoreToken {
+		dropTable("http_tokens")
+		renameTable(tokenTableTemp, "http_tokens")
+	}
+	if restorePush {
+		dropTable("push_datas")
+		renameTable(pushTableTemp, "push_datas")
+	}
+	if restoreClient {
+		dropTable("gcm_clients")
+		renameTable(clientTableTemp, "gcm_clients")
+	}
+}
+
+func renameTable(from, to string) {
+	db.Exec(fmt.Sprintf("ALTER TABLE %v RENAME TO %v", from, to))
+}
+
+func dropTable(name string) {
+	db.Exec(fmt.Sprintf("DROP TABLE %s", name))
 }
 
 func init() {

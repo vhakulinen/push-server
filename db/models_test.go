@@ -7,10 +7,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Rename("db.sqlite3", "db.sqlite3.backup")
 	SetupDatabase()
+	BackupForTesting()
 	code := m.Run()
-	os.Rename("db.sqlite3.backup", "db.sqlite3")
+	RestoreFromTesting()
 	os.Exit(code)
 }
 
