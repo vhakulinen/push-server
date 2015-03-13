@@ -177,6 +177,8 @@ func main() {
 	flag.Parse()
 	config.GetConfig(*configFile)
 
+	db.SetupDatabase()
+
 	logToTty, err := config.Config.Bool("log", "totty")
 	logFile, err := config.Config.String("log", "file")
 	host, err := config.Config.String("default", "host")

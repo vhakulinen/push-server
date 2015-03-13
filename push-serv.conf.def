@@ -24,3 +24,8 @@ skipEmailVerification=false
 
 [gcm]
 ApiKey=your_api_key
+
+[database]
+type=sqlite3 ;"sqlite3" or "postgres"
+name=name
+username=user

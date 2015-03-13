@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+
+	"github.com/vhakulinen/push-server/config"
 )
 
 func TestMain(m *testing.M) {
+	config.GetConfig("../push-serv.conf.def")
 	SetupDatabase()
 	BackupForTesting()
 	code := m.Run()
