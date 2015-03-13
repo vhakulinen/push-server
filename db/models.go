@@ -10,7 +10,6 @@ import (
 
 	"github.com/vhakulinen/push-server/utils"
 
-	"crypto/rand"
 	"crypto/sha256"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -77,22 +76,15 @@ func NewUser(email, password string) (*User, error) {
 
 func (u *User) BeforeCreate() error {
 	// Password hashing and salting
-	bsalt := make([]byte, PasswordSaltLength)
 	if len(u.Password) < MinPasswordLength {
 		return errors.New("Password is too short")
 	}
-	_, err := rand.Read(bsalt)
-	if err != nil {
-		log.Printf("Error in User.BeforeCreate() (%v)", err)
-		return errors.New("Something went wrong!")
-	}
-	salt := string(bsalt)
+	salt := utils.RandomString(PasswordSaltLength)
 	b := sha256.Sum256([]byte(u.Password + salt))
-	u.Password = salt + string(b[:])
+	u.Password = salt + fmt.Sprintf("%x", string(b[:]))
 
 	// Activate token
 	u.ActivateToken = utils.RandomString(activateTokenLength)
-
 	return nil
 }
 
@@ -105,7 +97,7 @@ func (u *User) ValidatePassword(password string) bool {
 	// TODO: Check that slice is not out of bounds
 	hash := sha256.Sum256([]byte(password + u.Password[:PasswordSaltLength]))
 	if len(u.Password) > PasswordSaltLength+MinPasswordLength {
-		if string(hash[:]) == u.Password[PasswordSaltLength:] {
+		if fmt.Sprintf("%x", hash[:]) == u.Password[PasswordSaltLength:] {
 			return true
 		}
 	} else {
