@@ -12,12 +12,19 @@ totty=false
 certpath=cert.pem
 keypath=key.pem
 
+[email]
+type=smtp ; smtp or sendgrid
+from=from@who.com
+
+[sendgrid]
+username=username
+password=password
+
 [smtp]
 host=localhost
 port=25
 username=username
 password=password
-from=from@who.com
 
 [registration]
 skipEmailVerification=false
