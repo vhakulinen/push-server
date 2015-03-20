@@ -210,6 +210,6 @@ func main() {
 	http.HandleFunc("/gcm/", GCMRegisterHandler)
 
 	if err := http.ListenAndServeTLS(httpHostPort, certPemFile, keyPemFile, nil); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }
