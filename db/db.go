@@ -62,6 +62,7 @@ func SetupDatabase() gorm.DB {
 	dbtype, err := config.Config.String("database", "type")
 	name, err := config.Config.String("database", "name")
 	username, err := config.Config.String("database", "username")
+	password, err := config.Config.String("database", "password")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,7 +72,7 @@ func SetupDatabase() gorm.DB {
 		break
 	case "postgres":
 		db, err = gorm.Open("postgres",
-			fmt.Sprintf("user=%s dbname=%s sslmode=disable", username, name))
+			fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", username, password, name))
 		break
 	default:
 		log.Fatal("Invalid database type!")
