@@ -15,7 +15,7 @@ var loaded = false
 
 var SendGcmPing = func(regIds []string) {
 	if !loaded {
-		loadGcmSender()
+		LoadConfig()
 		loaded = true
 	}
 
@@ -30,7 +30,7 @@ var SendGcmPing = func(regIds []string) {
 	}
 }
 
-func loadGcmSender() {
+func LoadConfig() {
 	gcmApiKey, err := config.Config.String("gcm", "ApiKey")
 
 	if err != nil {

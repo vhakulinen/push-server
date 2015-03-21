@@ -4,6 +4,9 @@ port=8080
 ; domain will be used in email messages
 domain=sub.domain.tld
 
+[tcp]
+port=9911
+
 [log]
 file=log
 totty=false

@@ -54,14 +54,14 @@ var sendGRID = func(m, email string) error {
 
 var SendRegistrationEmail = func(u *db.User) error {
 	if !configLoaded {
-		loadConfig()
+		LoadConfig()
 	}
 	uri := fmt.Sprintf("%s/activate/?email=%s&key=%s", domain, u.Email, u.ActivateToken)
 	regMessage := fmt.Sprintf(regMessageRaw, uri)
 	return sendMail(regMessage, u.Email)
 }
 
-func loadConfig() {
+func LoadConfig() {
 	emailType, _ := config.Config.String("email", "type")
 	from, _ = config.Config.String("email", "from")
 	domain, _ = config.Config.String("default", "domain")

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/vhakulinen/push-server/config"
 	"github.com/vhakulinen/push-server/db"
 	"github.com/vhakulinen/push-server/email"
+	"github.com/vhakulinen/push-server/tcp"
 	"github.com/vhakulinen/push-server/utils"
 )
 
@@ -69,6 +71,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 func PushHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	var pushData *db.PushData
+	var err error
+
 	title := r.FormValue("title")
 	body := r.FormValue("body")
 	token := r.FormValue("token")
@@ -85,16 +90,26 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Timestamp can't be less than 0"))
 			return
 		}
-		_, err = db.SavePushData(title, body, token, timestamp)
+		pushData, err = db.SavePushData(title, body, token, timestamp)
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 			return
 		}
 	} else {
-		_, err := db.SavePushDataMinimal(title, body, token)
+		pushData, err = db.SavePushDataMinimal(title, body, token)
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 			return
+		}
+	}
+
+	// Send this to TCP client if any
+	if send, ok := tcp.ClientFromPool(token); ok {
+		data, err := pushData.ToJson()
+		if err != nil {
+			// TODO: something went really wrong
+		} else {
+			send <- string(data)
 		}
 	}
 
@@ -173,11 +188,32 @@ func GCMRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func startTcp(addr string) {
+	sock, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("startTCP: failed to bind socket (%v)\n", err)
+		return
+	}
+	defer sock.Close()
+	log.Printf("Listening for TCP connections on %s\n", addr)
+
+	for {
+		conn, err := sock.Accept()
+		if err != nil {
+			log.Printf("Failed to appect connection (%v)\n", err)
+		} else {
+			go tcp.HandleTCPClient(conn)
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	config.GetConfig(*configFile)
 
 	db.SetupDatabase()
+	email.LoadConfig()
+	utils.LoadConfig()
 
 	logToTty, err := config.Config.Bool("log", "totty")
 	logFile, err := config.Config.String("log", "file")
@@ -186,12 +222,14 @@ func main() {
 	certPemFile, err := config.Config.String("ssl", "certpath")
 	keyPemFile, err := config.Config.String("ssl", "keypath")
 	skipEmailVerification, err = config.Config.Bool("registration", "skipEmailVerification")
+	tcpPort, err := config.Config.Int("tcp", "port")
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	httpHostPort = fmt.Sprintf("%s:%d", host, port)
+	tcpHostPort := fmt.Sprintf("%s:%d", host, tcpPort)
 
 	if !logToTty {
 		f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -201,6 +239,8 @@ func main() {
 		defer f.Close()
 		log.SetOutput(f)
 	}
+
+	go startTcp(tcpHostPort)
 
 	http.HandleFunc("/register/", RegisterHandler)
 	http.HandleFunc("/activate/", ActivateUserHandler)
