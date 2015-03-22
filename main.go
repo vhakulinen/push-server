@@ -1,10 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -188,8 +188,8 @@ func GCMRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func startTcp(addr string) {
-	sock, err := net.Listen("tcp", addr)
+func startTcp(addr string, config *tls.Config) {
+	sock, err := tls.Listen("tcp", addr, config)
 	if err != nil {
 		log.Fatalf("startTCP: failed to bind socket (%v)\n", err)
 		return
@@ -228,6 +228,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	cert, err := tls.LoadX509KeyPair(certPemFile, keyPemFile)
+	if err != nil {
+		log.Fatalf("Failed to load certificate key pair (%v)")
+	}
+	config := tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
 	httpHostPort = fmt.Sprintf("%s:%d", host, port)
 	tcpHostPort := fmt.Sprintf("%s:%d", host, tcpPort)
 
@@ -240,7 +248,7 @@ func main() {
 		log.SetOutput(f)
 	}
 
-	go startTcp(tcpHostPort)
+	go startTcp(tcpHostPort, &config)
 
 	http.HandleFunc("/register/", RegisterHandler)
 	http.HandleFunc("/activate/", ActivateUserHandler)
