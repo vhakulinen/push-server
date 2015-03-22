@@ -2,8 +2,9 @@ package tcp
 
 import (
 	"fmt"
+	"io"
 	"net"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/vhakulinen/push-server/db"
@@ -12,76 +13,111 @@ import (
 const (
 	// Seconds to wait for the token message
 	tokenReadDeadLine = 60
-	// The token's length is 36, but let's be ready for some witespace just in case
-	tokenMessageLen = 40
+	// The token's length is 36, so lets only read it
+	tokenMessageLen = 36
 )
 
-var tcpPool map[string]chan string
+type tcpPool struct {
+	m  map[string]chan<- string
+	mu sync.RWMutex // protects m
+}
 
-func ClientFromPool(token string) (chan string, bool) {
-	c, ok := tcpPool[token]
+func (t *tcpPool) Get(token string) (chan<- string, bool) {
+	t.mu.RLock()
+	c, ok := t.m[token]
+	t.mu.RUnlock()
+	return c, ok
+}
+
+func (t *tcpPool) Set(token string, c chan<- string) error {
+	// Check whether token is already in pool
+	_, ok := t.Get(token)
+	if ok {
+		return fmt.Errorf("Token already in map")
+	}
+
+	t.mu.Lock()
+	t.m[token] = c
+	t.mu.Unlock()
+	return nil
+}
+
+func (t *tcpPool) Remove(token string) error {
+	if _, ok := t.Get(token); ok {
+		t.mu.Lock()
+		delete(t.m, token)
+		t.mu.Unlock()
+		return nil
+	}
+	return fmt.Errorf("Token not in map")
+}
+
+var peers tcpPool
+
+func ClientFromPool(token string) (chan<- string, bool) {
+	c, ok := peers.Get(token)
 	return c, ok
 }
 
 func HandleTCPClient(conn net.Conn) {
 	var token string
-	var registeredToBool = false
+	var sendChan = make(chan string)
+	var quitChan = make(chan bool)
 	defer func() {
 		conn.Close()
-		if _, ok := tcpPool[token]; ok && registeredToBool {
-			delete(tcpPool, token)
+		if token != "" {
+			peers.Remove(token)
 		}
+		close(sendChan)
+		close(quitChan)
 	}()
-	var sendChan chan string
-	buf := make([]byte, tokenMessageLen)
-
 	// Dont wait forever for the first message
 	conn.SetReadDeadline(time.Now().Add(time.Second * tokenReadDeadLine))
-	count, err := conn.Read(buf)
+
+	buf := make([]byte, tokenMessageLen)
+	count, err := io.ReadFull(conn, buf)
 	if err != nil {
 		//TODO: logging
+		if count < tokenMessageLen {
+			conn.Write([]byte("Timeout"))
+		}
 		return
 	}
 
-	token = strings.TrimSpace(string(buf[:count]))
+	token = string(buf)
 	if _, err = db.GetHttpToken(fmt.Sprintf("%s", token)); err != nil {
 		conn.Write([]byte("Token not found!"))
 		return
 	}
-	if _, ok := tcpPool[token]; ok {
-		conn.Write([]byte("TCP client already listening for this token!"))
+	if err = peers.Set(token, sendChan); err != nil {
+		conn.Write([]byte("Client already listening for this token"))
 		return
 	}
-
-	sendChan = make(chan string)
-	tcpPool[token] = sendChan
-	registeredToBool = true
 
 	// No need for deadline anymore
 	conn.SetReadDeadline(time.Time{})
 
-	// If we read _anything_ from client anymore, close it and close
-	// the sendChan so we can exit from the for loop
 	go func() {
 		conn.Read(make([]byte, 1))
-		close(sendChan)
+		quitChan <- true
 	}()
 
 	for {
-		data, ok := <-sendChan
-		if ok {
-			_, err = conn.Write([]byte(data))
-			if err != nil {
-				// TODO: Logging
-				close(sendChan)
-				break
+		select {
+		case data, ok := <-sendChan:
+			if ok {
+				conn.Write([]byte(data))
+			} else {
+				return
 			}
-		} else {
-			break
+		case <-quitChan:
+			return
 		}
 	}
 }
 
 func init() {
-	tcpPool = make(map[string]chan string)
+	peers = tcpPool{
+		m: make(map[string]chan<- string),
+	}
 }
