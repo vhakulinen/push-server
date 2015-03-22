@@ -222,6 +222,7 @@ func main() {
 	certPemFile, err := config.Config.String("ssl", "certpath")
 	keyPemFile, err := config.Config.String("ssl", "keypath")
 	skipEmailVerification, err = config.Config.Bool("registration", "skipEmailVerification")
+	tcpHost, err := config.Config.String("tcp", "host")
 	tcpPort, err := config.Config.Int("tcp", "port")
 
 	if err != nil {
@@ -237,7 +238,7 @@ func main() {
 	}
 
 	httpHostPort = fmt.Sprintf("%s:%d", host, port)
-	tcpHostPort := fmt.Sprintf("%s:%d", host, tcpPort)
+	tcpHostPort := fmt.Sprintf("%s:%d", tcpHost, tcpPort)
 
 	if !logToTty {
 		f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)

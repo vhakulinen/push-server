@@ -5,6 +5,7 @@ port=8080
 domain=sub.domain.tld
 
 [tcp]
+host=localhost
 port=9911
 
 [log]
