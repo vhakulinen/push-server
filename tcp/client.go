@@ -106,7 +106,7 @@ func HandleTCPClient(conn net.Conn) {
 		select {
 		case data, ok := <-sendChan:
 			if ok {
-				conn.Write([]byte(data))
+				conn.Write([]byte(data + "\n"))
 			} else {
 				return
 			}
