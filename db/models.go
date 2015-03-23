@@ -32,9 +32,10 @@ type User struct {
 	Active        bool
 	ActivateToken string
 
-	Email       string `sql:"not null;unique"`
-	Password    string
-	HttpTokenId int64 `sql:"not null;unique"`
+	Email      string `sql:"not null;unique"`
+	Password   string
+	Token      string `sql:"unique"`
+	GCMClients []GCMClient
 }
 
 // Creates new user and saves it to database
@@ -53,22 +54,15 @@ func NewUser(email, password string) (*User, error) {
 		return nil, fmt.Errorf("Invalid email address")
 	}
 	if db.Where("email = ?", email).First(u).RecordNotFound() {
-		token, err := GenerateAndSaveToken()
-		if err != nil {
-			return nil, err
-		}
 		u = &User{
-			Email:       email,
-			Password:    password,
-			HttpTokenId: token.Id,
+			Email:    email,
+			Password: password,
+			Token:    uuid.NewRandom().String(),
 		}
 		if err := db.Save(u).Error; err != nil {
-			token.Delete()
 			log.Printf("Error in NewUser() (%v)", err)
 			return nil, fmt.Errorf("Something went wrong!")
 		}
-		token.UserId = u.Id
-		token.Save()
 		return u, nil
 	}
 	return nil, fmt.Errorf("User exists")
@@ -88,8 +82,18 @@ func (u *User) BeforeCreate() error {
 	return nil
 }
 
+func (u *User) AfterFind() {
+	gcmClients := []GCMClient{}
+	db.Where("token = ?", u.Token).Find(&gcmClients)
+	u.GCMClients = gcmClients
+}
+
 func (u *User) Activate() {
 	u.Active = true
+	db.Save(u)
+}
+
+func (u *User) Save() {
 	db.Save(u)
 }
 
@@ -104,89 +108,6 @@ func (u *User) ValidatePassword(password string) bool {
 		log.Println("Invalid password in database (password length is too short)")
 	}
 	return false
-}
-
-func (u *User) HttpToken() (*HttpToken, error) {
-	t := new(HttpToken)
-	if db.Where("id = ?", u.HttpTokenId).First(t).RecordNotFound() {
-		return nil, fmt.Errorf("Token not found")
-	}
-	return t, nil
-}
-
-type HttpToken struct {
-	Id         int64
-	CreatedAt  time.Time
-	AccessedAt time.Time
-	DeletedAt  time.Time
-
-	UserId int64 `sql:"not null"`
-
-	Token      string `sql:"not null;unique"`
-	GCMClients []GCMClient
-}
-
-func GenerateAndSaveToken() (*HttpToken, error) {
-	var id string
-	count := 0
-	for {
-		id = uuid.NewUUID().String()
-		if t, err := RegisterHttpToken(id); err == nil {
-			return t, nil
-		} else {
-			if count >= 3 {
-				log.Printf("Error in GenerateAndSaveToken() (%v)", err)
-				return nil, fmt.Errorf("Couldn't generate new token!")
-			}
-			count++
-		}
-	}
-}
-
-// Register token for http pooling
-func RegisterHttpToken(token string) (t *HttpToken, err error) {
-	t = new(HttpToken)
-	if db.Where("token = ?", token).First(t).RecordNotFound() {
-		t = &HttpToken{
-			Token:      token,
-			AccessedAt: time.Now(),
-		}
-		if err = db.Save(t).Error; err != nil {
-			return nil, err
-		}
-		return t, nil
-	}
-	return nil, fmt.Errorf("HttpToken already registered")
-}
-
-func (t *HttpToken) Save() {
-	db.Save(t)
-}
-
-func (t *HttpToken) Delete() {
-	db.Delete(t)
-}
-
-// NOTE: This updates AccessedAt time!
-func (t *HttpToken) GetPushes() []PushData {
-	pushes := []PushData{}
-	db.Where("token = ?", t.Token).Find(&pushes)
-
-	// Soft delete fetched push datas
-	for _, p := range pushes {
-		db.Delete(p)
-	}
-
-	// Update the AccessedAt time
-	t.AccessedAt = time.Now()
-	t.Save()
-	return pushes
-}
-
-func (t *HttpToken) AfterFind() {
-	gcmClients := []GCMClient{}
-	db.Where("token = ?", t.Token).Find(&gcmClients)
-	t.GCMClients = gcmClients
 }
 
 type PushData struct {
@@ -209,9 +130,8 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 	}
 
 	// Check that token exists
-	_, err = GetHttpToken(token)
-	if err != nil {
-		return nil, err
+	if db.Where("token = ?", token).First(&User{}).RecordNotFound() {
+		return nil, fmt.Errorf("Token doesn't exist")
 	}
 
 	p = &PushData{
@@ -254,8 +174,8 @@ type GCMClient struct {
 }
 
 func RegisterGCMClient(gcmId, token string) (*GCMClient, error) {
-	t := new(HttpToken)
-	if db.Where("token = ?", token).First(t).RecordNotFound() {
+	u := new(User)
+	if db.Where("token = ?", token).First(u).RecordNotFound() {
 		return nil, fmt.Errorf("Token not found")
 	}
 	g := new(GCMClient)
@@ -266,33 +186,33 @@ func RegisterGCMClient(gcmId, token string) (*GCMClient, error) {
 			Token: token,
 		}
 		g.Save()
-		t.GCMClients = append(t.GCMClients, *g)
-		t.Save()
+		u.GCMClients = append(u.GCMClients, *g)
+		u.Save()
 		return g, nil
-	} else if g.Token == t.Token {
+	} else if g.Token == u.Token {
 		// Same token as before, so let it be
 		return nil, nil
 	} else {
 		// If the client has already registered, update the token
 		// But before that, delete the GCMClient from the old token's client list
-		oldt := new(HttpToken)
-		if !db.Where("token = ?", g.Token).First(oldt).RecordNotFound() {
+		oldu := new(User)
+		if !db.Where("token = ?", g.Token).First(oldu).RecordNotFound() {
 			var pos = -1
-			for i, client := range oldt.GCMClients {
+			for i, client := range oldu.GCMClients {
 				if client.GCMId == g.GCMId {
 					pos = i
 					break
 				}
 			}
 			if pos != -1 {
-				oldt.GCMClients = append(oldt.GCMClients[:pos], oldt.GCMClients[pos+1:]...)
-				oldt.Save()
+				oldu.GCMClients = append(oldu.GCMClients[:pos], oldu.GCMClients[pos+1:]...)
+				oldu.Save()
 			}
 		}
 		g.Token = token
 		g.Save()
-		t.GCMClients = append(t.GCMClients, *g)
-		t.Save()
+		u.GCMClients = append(u.GCMClients, *g)
+		u.Save()
 		return g, nil
 	}
 }

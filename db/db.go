@@ -14,7 +14,6 @@ import (
 const (
 	userTableTemp   = "user_temp"
 	pushTableTemp   = "push_temp"
-	tokenTableTemp  = "token_temp"
 	clientTableTemp = "client_temp"
 )
 
@@ -22,7 +21,6 @@ const (
 var (
 	restoreUser   = false
 	restorePush   = false
-	restoreToken  = false
 	restoreClient = false
 )
 
@@ -34,26 +32,37 @@ func GetAllPushDatas() []PushData {
 	return pushdatas
 }
 
-func GetHttpToken(token string) (t *HttpToken, err error) {
-	t = new(HttpToken)
-	if db.Where("token = ?", token).First(t).RecordNotFound() {
-		return nil, fmt.Errorf("Token not found")
-	}
-	return t, nil
-}
-
-func GetAllTokens() []HttpToken {
-	tokens := []HttpToken{}
-	db.Find(&tokens)
-	return tokens
-}
-
 func GetUser(email string) (*User, error) {
 	u := new(User)
 	if db.Where("email = ?", email).First(u).RecordNotFound() {
 		return nil, fmt.Errorf("User not found")
 	}
 	return u, nil
+}
+
+func GetUserByToken(token string) (*User, error) {
+	u := new(User)
+	if db.Where("token = ?", token).First(u).RecordNotFound() {
+		return nil, fmt.Errorf("Token doesn't exists")
+	}
+	return u, nil
+}
+
+func TokenExists(token string) bool {
+	u := new(User)
+	if db.Where("token = ?", token).First(u).RecordNotFound() {
+		return false
+	}
+	return true
+}
+
+func GetPushesForToken(token string) []PushData {
+	out := []PushData{}
+	u, err := GetUserByToken(token)
+	if err == nil {
+		db.Where("token = ?", u.Token).Find(&out)
+	}
+	return out
 }
 
 // This is just for testing purposes
@@ -69,6 +78,7 @@ func SetupDatabase() gorm.DB {
 	switch dbtype {
 	case "sqlite3":
 		db, err = gorm.Open("sqlite3", name)
+		db.Exec("PRAGMA foreign_keys = ON")
 		break
 	case "postgres":
 		db, err = gorm.Open("postgres",
@@ -81,9 +91,8 @@ func SetupDatabase() gorm.DB {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db.AutoMigrate(&PushData{})
-	db.AutoMigrate(&HttpToken{})
 	db.AutoMigrate(&User{})
+	db.AutoMigrate(&PushData{})
 	db.AutoMigrate(&GCMClient{})
 	return db
 }
@@ -93,11 +102,6 @@ func BackupForTesting() {
 		restoreUser = true
 		renameTable("users", userTableTemp)
 		db.CreateTable(&User{})
-	}
-	if ok := db.HasTable(&HttpToken{}); ok {
-		restoreToken = true
-		renameTable("http_tokens", tokenTableTemp)
-		db.CreateTable(&HttpToken{})
 	}
 	if ok := db.HasTable(&PushData{}); ok {
 		restorePush = true
@@ -115,10 +119,6 @@ func RestoreFromTesting() {
 	if restoreUser {
 		dropTable("users")
 		renameTable(userTableTemp, "users")
-	}
-	if restoreToken {
-		dropTable("http_tokens")
-		renameTable(tokenTableTemp, "http_tokens")
 	}
 	if restorePush {
 		dropTable("push_datas")

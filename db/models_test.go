@@ -91,25 +91,12 @@ func TestValidatePassword(t *testing.T) {
 	db.Unscoped().Delete(u)
 }
 
-func TestRegisterHttpToken(t *testing.T) {
-	var tokenStr = "oekfokefokef"
-	token, err := RegisterHttpToken(tokenStr)
-	if err != nil {
-		t.Errorf("Couldn't register token! (%v)", err)
-	}
-	_, err = RegisterHttpToken(tokenStr)
-	if err == nil {
-		t.Errorf("Expected error while duplicating token, didn't get one!")
-	}
-
-	db.Unscoped().Delete(token)
-}
-
 func TestSavePushData(t *testing.T) {
-	token, err := GenerateAndSaveToken()
+	u, err := NewUser("save@pushdata.com", "password")
 	if err != nil {
-		t.Fatalf("Failed to generate token! (%v)", err)
+		t.Fatalf("Failed to create user! (%v)", err)
 	}
+	token := u.Token
 	var testData = []struct {
 		Title     string
 		Body      string
@@ -118,11 +105,11 @@ func TestSavePushData(t *testing.T) {
 
 		ExpectingErr bool
 	}{
-		{"required", "", token.Token, -1, true}, // Timestamp less than 0
-		{"required", "", token.Token, 123, false},
-		{"", "bod", token.Token, 0, true},          // No title
-		{"title", "body", "", 0, true},             // To token
-		{"title", "body", token.Token, 123, false}, // Everything is good
+		{"required", "", token, -1, true}, // Timestamp less than 0
+		{"required", "", token, 123, false},
+		{"", "bod", token, 0, true},          // No title
+		{"title", "body", "", 0, true},       // To token
+		{"title", "body", token, 123, false}, // Everything is good
 		{"there is no", "valid token", "invalidtoken", 0, true},
 	}
 
@@ -164,9 +151,13 @@ func TestToJson(t *testing.T) {
 		UnixTimeStamp int64
 	}
 
-	token, _ := GenerateAndSaveToken()
+	u, err := NewUser("to@jsontest.com", "password")
+	if err != nil {
+		t.Fatalf("Failed to create user  (%v)\n", err)
+	}
+	token := u.Token
 
-	pushdata, err := SavePushData(title, body, token.Token, time)
+	pushdata, err := SavePushData(title, body, token, time)
 	if err != nil {
 		t.Fatalf("Failed to create push data! (%v)", err)
 	}

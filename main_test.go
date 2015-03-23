@@ -54,8 +54,7 @@ func TestRetrieveHandler(t *testing.T) {
 	}
 	user.Activate()
 
-	tk, _ := user.HttpToken()
-	token = tk.Token
+	token = user.Token
 
 	var testData = []struct {
 		email          string
@@ -234,6 +233,9 @@ func TestRegisterHandler(t *testing.T) {
 
 	// Check the user.Active state
 	user, err := db.GetUser(semail)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if user.Active != true {
 		t.Errorf("User.Active should be true since skipEmailVerification option was set to true in configuration!")
 	}
@@ -304,18 +306,21 @@ func TestPushHandler(t *testing.T) {
 		count++
 	}
 
-	to, _ := db.GenerateAndSaveToken()
+	u, err := db.NewUser("gen@user.com", "password")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	db.RegisterGCMClient("id1", to.Token)
-	db.RegisterGCMClient("id2", to.Token)
+	db.RegisterGCMClient("id1", u.Token)
+	db.RegisterGCMClient("id2", u.Token)
 
 	form := url.Values{}
 	form.Add("title", "title")
 	form.Add("body", "body")
-	form.Add("token", to.Token)
+	form.Add("token", u.Token)
 	form.Add("timestamp", "0")
 
-	_, err := http.PostForm(ts.URL, form)
+	_, err = http.PostForm(ts.URL, form)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,8 +347,7 @@ func TestPoolHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create user! (%v)", err)
 	}
-	token, _ := user.HttpToken()
-	pushToken = token.Token
+	pushToken = user.Token
 
 	// Add push data
 	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushTime)
@@ -408,22 +412,24 @@ func TestGCMRegisterHandler(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(GCMRegisterHandler))
 	defer ts.Close()
 
-	token, err := db.GenerateAndSaveToken()
-	token2, err := db.GenerateAndSaveToken()
+	u1, err := db.NewUser("gcm1@gcm.com", "password")
+	u2, err := db.NewUser("gcm2@gcm.com", "password")
 	if err != nil {
-		t.Fatalf("Failed to create new HttpToken (%v)", err)
+		t.Fatalf("Failed to create users (%v)", err)
 	}
 
+	token := u1.Token
+	token2 := u2.Token
 	var testData = []struct {
 		token        string
 		gcmid        string
 		expectedCode int
 	}{
 		{"", "", 400},
-		{token.Token, "gcmid", 200},
-		{token.Token, "gcmid", 200},  // Same token, should just pass
-		{token2.Token, "gcmid", 200}, // Update the token
-		{token.Token, "gcmid2", 200},
+		{token, "gcmid", 200},
+		{token, "gcmid", 200},  // Same token, should just pass
+		{token2, "gcmid", 200}, // Update the token
+		{token, "gcmid2", 200},
 		{"footoken", "foobar", 500}, // invalid token
 	}
 

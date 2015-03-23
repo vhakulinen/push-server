@@ -85,7 +85,7 @@ func HandleTCPClient(conn net.Conn) {
 	}
 
 	token = string(buf)
-	if _, err = db.GetHttpToken(fmt.Sprintf("%s", token)); err != nil {
+	if !db.TokenExists(fmt.Sprintf("%s", token)) {
 		conn.Write([]byte("Token not found!"))
 		return
 	}

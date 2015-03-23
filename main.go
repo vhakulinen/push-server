@@ -59,9 +59,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if skipEmailVerification {
 		user.Activate()
-		token, _ := user.HttpToken()
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(token.Token))
+		w.Write([]byte(user.Token))
 	} else {
 		email.SendRegistrationEmail(user)
 		w.WriteHeader(http.StatusOK)
@@ -114,13 +113,13 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If we made it here, push data was saved so lets notify GCM clients about that
-	t, err := db.GetHttpToken(token)
+	u, err := db.GetUserByToken(token)
 	if err != nil {
 		return
 	}
 
 	var regIds []string
-	for _, c := range t.GCMClients {
+	for _, c := range u.GCMClients {
 		regIds = append(regIds, c.GCMId)
 	}
 
@@ -134,9 +133,8 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	data := ""
 	token := r.FormValue("token")
-	t, err := db.GetHttpToken(token)
-	if err == nil {
-		for _, push := range t.GetPushes() {
+	if db.TokenExists(token) {
+		for _, push := range db.GetPushesForToken(token) {
 			tmp, err := push.ToJson()
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -159,13 +157,7 @@ func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(http.StatusText(http.StatusNotFound)))
 	} else {
-		t, err := user.HttpToken()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(http.StatusText(http.StatusInternalServerError)))
-		} else {
-			w.Write([]byte(t.Token))
-		}
+		w.Write([]byte(user.Token))
 	}
 }
 
