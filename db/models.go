@@ -115,7 +115,7 @@ type PushData struct {
 	CreatedAt time.Time `json:"-"`
 	DeletedAt time.Time `json:"-"`
 
-	Accessed bool
+	Accessed bool `json:"-"`
 
 	UnixTimeStamp int64
 	Title         string `sql:"not null"`
