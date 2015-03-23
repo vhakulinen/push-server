@@ -115,6 +115,8 @@ type PushData struct {
 	CreatedAt time.Time `json:"-"`
 	DeletedAt time.Time `json:"-"`
 
+	Accessed bool
+
 	UnixTimeStamp int64
 	Title         string `sql:"not null"`
 	Body          string
@@ -139,6 +141,7 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 		Body:          body,
 		Token:         token,
 		UnixTimeStamp: timestamp,
+		Accessed:      false,
 	}
 	if err = db.Save(p).Error; err != nil {
 		fmt.Printf("%v", err)
@@ -149,6 +152,15 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 
 func SavePushDataMinimal(title, body, token string) (p *PushData, err error) {
 	return SavePushData(title, body, token, 0)
+}
+
+func (p *PushData) SetAccessed() {
+	p.Accessed = true
+	p.Save()
+}
+
+func (p *PushData) Save() {
+	db.Save(p)
 }
 
 func (p *PushData) Delete() {

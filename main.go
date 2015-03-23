@@ -135,7 +135,11 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.FormValue("token")
 	if db.TokenExists(token) {
 		for _, push := range db.GetPushesForToken(token) {
+			if push.Accessed {
+				continue
+			}
 			tmp, err := push.ToJson()
+			push.SetAccessed()
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte("Something went wrong!"))
