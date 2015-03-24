@@ -121,9 +121,15 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 				// TODO: something went really wrong
 			} else {
 				send <- string(data)
+				if pushData.Priority == 2 {
+					pushData.Sound = false
+					pushData.Save()
+				}
 			}
 		}
 	}
+	// NOTE: if we need pushData after this, we should reload it since it
+	// might have been modified
 
 	// If we made it here, push data was saved so lets notify GCM clients about that
 	u, err := db.GetUserByToken(token)

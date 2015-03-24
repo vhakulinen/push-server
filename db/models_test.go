@@ -147,6 +147,9 @@ func TestSavePushData(t *testing.T) {
 		} else if pushData.Priority != data.Priority {
 			t.Errorf("Prioties didn't match! (%v != %v)", pushData.Priority, data.Priority)
 		}
+		if pushData.Sound != true {
+			t.Errorf("PushData.Sound should default to true")
+		}
 
 		db.Unscoped().Delete(pushData)
 	}

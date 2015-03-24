@@ -130,7 +130,8 @@ type PushData struct {
 	// * = default
 	//
 	// Invalid value defaults to 1
-	Priority int64
+	Priority int64 `json:"-"`
+	Sound    bool
 }
 
 func SavePushData(title, body, token string, timestamp, priority int64) (p *PushData, err error) {
@@ -156,6 +157,7 @@ func SavePushData(title, body, token string, timestamp, priority int64) (p *Push
 		UnixTimeStamp: timestamp,
 		Accessed:      false,
 		Priority:      priority,
+		Sound:         true,
 	}
 	if err = db.Save(p).Error; err != nil {
 		fmt.Printf("%v", err)
