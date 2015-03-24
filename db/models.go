@@ -121,14 +121,27 @@ type PushData struct {
 	Title         string `sql:"not null"`
 	Body          string
 	Token         string `sql:"not null" json:"-"`
+	// Priority defines whether we send the data to all clients, do we make seound etc.
+	//
+	// Possible values:
+	// 1*: Send to all clients
+	// 2: Don't make sound on GCM clients if TCP client is listening
+	// 3: Don't send to TCP client
+	// * = default
+	//
+	// Invalid value defaults to 1
+	Priority int64
 }
 
-func SavePushData(title, body, token string, timestamp int64) (p *PushData, err error) {
+func SavePushData(title, body, token string, timestamp, priority int64) (p *PushData, err error) {
 	if timestamp < 0 {
 		return nil, fmt.Errorf("Timestamp can't be less than 0")
 	}
 	if title == "" || token == "" {
 		return nil, fmt.Errorf("token and title required")
+	}
+	if priority > 3 || priority < 1 {
+		priority = 1
 	}
 
 	// Check that token exists
@@ -142,6 +155,7 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 		Token:         token,
 		UnixTimeStamp: timestamp,
 		Accessed:      false,
+		Priority:      priority,
 	}
 	if err = db.Save(p).Error; err != nil {
 		fmt.Printf("%v", err)
@@ -150,8 +164,8 @@ func SavePushData(title, body, token string, timestamp int64) (p *PushData, err 
 	return p, nil
 }
 
-func SavePushDataMinimal(title, body, token string) (p *PushData, err error) {
-	return SavePushData(title, body, token, 0)
+func SavePushDataMinimal(title, body, token string, priority int64) (p *PushData, err error) {
+	return SavePushData(title, body, token, 0, priority)
 }
 
 func (p *PushData) SetAccessed() {

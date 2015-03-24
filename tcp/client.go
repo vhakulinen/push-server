@@ -54,7 +54,7 @@ func (t *tcpPool) Remove(token string) error {
 
 var peers tcpPool
 
-func ClientFromPool(token string) (chan<- string, bool) {
+var ClientFromPool = func(token string) (chan<- string, bool) {
 	c, ok := peers.Get(token)
 	return c, ok
 }

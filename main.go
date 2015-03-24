@@ -69,14 +69,25 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PushHandler(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
 	var pushData *db.PushData
 	var err error
+	var priority int
 
 	title := r.FormValue("title")
 	body := r.FormValue("body")
 	token := r.FormValue("token")
 	stimestamp := r.FormValue("timestamp")
+	spriority := r.FormValue("priority")
+
+	// Parse priority, default to 1 - SavePushData will convert invalid
+	// values to vaild ones
+	if spriority != "" {
+		priority, err = strconv.Atoi(spriority)
+		if err != nil {
+			priority = 1
+		}
+	}
+
 	if stimestamp != "" {
 		timestamp, err := strconv.ParseInt(stimestamp, 10, 64)
 		if err != nil {
@@ -89,26 +100,28 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Timestamp can't be less than 0"))
 			return
 		}
-		pushData, err = db.SavePushData(title, body, token, timestamp)
+		pushData, err = db.SavePushData(title, body, token, timestamp, int64(priority))
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 			return
 		}
 	} else {
-		pushData, err = db.SavePushDataMinimal(title, body, token)
+		pushData, err = db.SavePushDataMinimal(title, body, token, int64(priority))
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 			return
 		}
 	}
 
-	// Send this to TCP client if any
-	if send, ok := tcp.ClientFromPool(token); ok {
-		data, err := pushData.ToJson()
-		if err != nil {
-			// TODO: something went really wrong
-		} else {
-			send <- string(data)
+	if pushData.Priority != 3 {
+		// Send this to TCP client if any
+		if send, ok := tcp.ClientFromPool(token); ok {
+			data, err := pushData.ToJson()
+			if err != nil {
+				// TODO: something went really wrong
+			} else {
+				send <- string(data)
+			}
 		}
 	}
 

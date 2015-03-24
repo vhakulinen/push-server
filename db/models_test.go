@@ -102,19 +102,24 @@ func TestSavePushData(t *testing.T) {
 		Body      string
 		Token     string
 		TimeStamp int64
+		Priority  int64
 
 		ExpectingErr bool
 	}{
-		{"required", "", token, -1, true}, // Timestamp less than 0
-		{"required", "", token, 123, false},
-		{"", "bod", token, 0, true},          // No title
-		{"title", "body", "", 0, true},       // To token
-		{"title", "body", token, 123, false}, // Everything is good
-		{"there is no", "valid token", "invalidtoken", 0, true},
+		{"required", "", token, -1, 1, true}, // Timestamp less than 0
+		{"required", "", token, 123, 1, false},
+		{"required", "", token, 123, 2, false},
+		{"required", "", token, 123, 10, false}, // Priority should default to 1
+		{"required", "", token, 123, 0, false},  // Priority should default to 1
+		{"", "bod", token, 0, 1, true},          // No title
+		{"title", "body", "", 0, 1, true},       // To token
+		{"title", "body", token, 123, 1, false}, // Everything is good
+		{"there is no", "valid token", "invalidtoken", 0, 1, true},
 	}
 
 	for _, data := range testData {
-		pushData, err := SavePushData(data.Title, data.Body, data.Token, data.TimeStamp)
+		pushData, err := SavePushData(data.Title, data.Body, data.Token,
+			data.TimeStamp, data.Priority)
 		if err != nil {
 			if !data.ExpectingErr {
 				t.Errorf("Got error while not expecting one! (%v)", err)
@@ -134,6 +139,13 @@ func TestSavePushData(t *testing.T) {
 		}
 		if pushData.Token != data.Token {
 			t.Errorf("Tokens didn't match! (%v != %v)", data.Token, pushData.Token)
+		}
+		if data.Priority > 3 || data.Priority < 1 {
+			if pushData.Priority != 1 {
+				t.Errorf("Priority should default to 1 with invaild value! (value was %d)", data.Priority)
+			}
+		} else if pushData.Priority != data.Priority {
+			t.Errorf("Prioties didn't match! (%v != %v)", pushData.Priority, data.Priority)
 		}
 
 		db.Unscoped().Delete(pushData)
@@ -157,7 +169,7 @@ func TestToJson(t *testing.T) {
 	}
 	token := u.Token
 
-	pushdata, err := SavePushData(title, body, token, time)
+	pushdata, err := SavePushData(title, body, token, time, 1)
 	if err != nil {
 		t.Fatalf("Failed to create push data! (%v)", err)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/vhakulinen/push-server/config"
 	"github.com/vhakulinen/push-server/db"
 	"github.com/vhakulinen/push-server/email"
+	"github.com/vhakulinen/push-server/tcp"
 	"github.com/vhakulinen/push-server/utils"
 )
 
@@ -247,26 +248,57 @@ func TestPushHandler(t *testing.T) {
 		PushHander doesnt care if the token is valid or not, so we dont check
 		the return messages because those will only contain error messages
 		to user, if even those.
+
+		Also, was the priority whatever, it shouldn't cause any problem
 	*/
 
 	ts := httptest.NewServer(http.HandlerFunc(PushHandler))
 	defer ts.Close()
+
+	// Backup to restore
+	oClientFromPool := tcp.ClientFromPool
+	defer func() {
+		tcp.ClientFromPool = oClientFromPool
+	}()
+
+	tcpcount := 0
+	tcp.ClientFromPool = func(token string) (chan<- string, bool) {
+		tcpcount++
+		return nil, false
+	}
+
+	u, err := db.NewUser("push@test1.com", "password")
+	if err != nil {
+		t.Fatalf("Failed to craete new user (%v)", err)
+	}
 
 	var testData = []struct {
 		title        string
 		body         string
 		token        string
 		timestamp    string
+		priority     string
 		expectedCode int
 	}{
+		// TODO: Check if tcp.CLientFromPool is called when it should/shouldn't
 		// Server doesnt notify user if the token is invalid
 		// so this takes care of invalid and valid token situations
-		{"title", "body", "invalidtoken", "", 200},
 
-		{"title", "body", "token", "invalidtimestapm", 400},
-		{"title", "body", "token", "-11", 400},
-		{"", "noTokenNorTitle", "", "", 200},
-		{"", "noTokenNorTitleWithTimeStamp", "", "100", 200},
+		{"title", "body", u.Token, "", "on", 200},
+		{"title", "body", u.Token, "", "10", 200},
+		{"title", "body", u.Token, "", "-1", 200},
+		{"title", "body", u.Token, "", "1", 200},
+		{"title", "body", u.Token, "", "2", 200},
+		{"title", "body", u.Token, "", "3", 200},
+
+		// All cases below are expected to fail
+		{"title", "body", "invalidtoken", "", "10", 200},
+
+		{"title", "body", "token", "invalidtimestapm", "", 400},
+		{"title", "body", "token", "-11", "", 400},
+		{"", "noTokenNorTitle", "", "", "2", 200},
+		{"", "noTokenNorTitle", "", "", "3", 200},
+		{"", "noTokenNorTitleWithTimeStamp", "", "100", "nn", 200},
 	}
 
 	for i, data := range testData {
@@ -275,6 +307,7 @@ func TestPushHandler(t *testing.T) {
 		form.Add("body", data.body)
 		form.Add("token", data.token)
 		form.Add("timestamp", data.timestamp)
+		form.Add("priority", data.priority)
 
 		res, err := http.PostForm(ts.URL, form)
 		if err != nil {
@@ -284,6 +317,10 @@ func TestPushHandler(t *testing.T) {
 		if res.StatusCode != data.expectedCode {
 			t.Errorf("Got %d, want %d (run %d)", res.StatusCode, data.expectedCode, i)
 		}
+	}
+
+	if tcpcount != 5 {
+		t.Errorf("tcp.ClientFromPool call count was unexpected (expected %v, got %v)", 5, tcpcount)
 	}
 
 	count := 0
@@ -306,7 +343,7 @@ func TestPushHandler(t *testing.T) {
 		count++
 	}
 
-	u, err := db.NewUser("gen@user.com", "password")
+	u, err = db.NewUser("gen@user.com", "password")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +387,7 @@ func TestPoolHandler(t *testing.T) {
 	pushToken = user.Token
 
 	// Add push data
-	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushTime)
+	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushTime, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
