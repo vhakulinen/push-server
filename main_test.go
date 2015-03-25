@@ -280,7 +280,6 @@ func TestPushHandler(t *testing.T) {
 		priority     string
 		expectedCode int
 	}{
-		// TODO: Check if tcp.CLientFromPool is called when it should/shouldn't
 		// Server doesnt notify user if the token is invalid
 		// so this takes care of invalid and valid token situations
 
