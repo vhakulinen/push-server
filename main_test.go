@@ -374,6 +374,7 @@ func TestPoolHandler(t *testing.T) {
 	var pushToken string
 	var pushTitle = "title"
 	var pushBody = "body"
+	var pushUrl = "www.ddg.gg"
 	var pushTime = time.Now().Unix()
 
 	ts := httptest.NewServer(http.HandlerFunc(PoolHandler))
@@ -387,7 +388,7 @@ func TestPoolHandler(t *testing.T) {
 	pushToken = user.Token
 
 	// Add push data
-	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushTime, 1)
+	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushUrl, pushTime, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,6 +407,7 @@ func TestPoolHandler(t *testing.T) {
 		UnixTimeStamp int64
 		Title         string
 		Body          string
+		Url           string
 	}
 
 	for i, data := range testData {
@@ -440,6 +442,9 @@ func TestPoolHandler(t *testing.T) {
 			}
 			if v.UnixTimeStamp != pushTime {
 				t.Errorf("Got \"%v\" in time, want \"%d\"", v.UnixTimeStamp, pushTime)
+			}
+			if v.Url != pushUrl {
+				t.Errorf("Got \"%v\" in time, want \"%v\"", v.Url, pushUrl)
 			}
 		}
 	}

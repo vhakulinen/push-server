@@ -78,6 +78,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.FormValue("token")
 	stimestamp := r.FormValue("timestamp")
 	spriority := r.FormValue("priority")
+	uri := r.FormValue("url")
 
 	// Parse priority, default to 1 - SavePushData will convert invalid
 	// values to vaild ones
@@ -100,13 +101,13 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Timestamp can't be less than 0"))
 			return
 		}
-		pushData, err = db.SavePushData(title, body, token, timestamp, int64(priority))
+		pushData, err = db.SavePushData(title, body, token, uri, timestamp, int64(priority))
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 			return
 		}
 	} else {
-		pushData, err = db.SavePushDataMinimal(title, body, token, int64(priority))
+		pushData, err = db.SavePushDataMinimal(title, body, token, uri, int64(priority))
 		if err != nil {
 			log.Printf("Something went wrong! (%v)", err)
 			return

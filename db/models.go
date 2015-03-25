@@ -121,6 +121,10 @@ type PushData struct {
 	Title         string `sql:"not null"`
 	Body          string
 	Token         string `sql:"not null" json:"-"`
+	// Url to open on client side
+	//
+	// Url is not validated
+	Url string
 	// Priority defines whether we send the data to all clients, do we make seound etc.
 	//
 	// Possible values:
@@ -134,7 +138,7 @@ type PushData struct {
 	Sound    bool
 }
 
-func SavePushData(title, body, token string, timestamp, priority int64) (p *PushData, err error) {
+func SavePushData(title, body, token, strurl string, timestamp, priority int64) (p *PushData, err error) {
 	if timestamp < 0 {
 		return nil, fmt.Errorf("Timestamp can't be less than 0")
 	}
@@ -158,6 +162,7 @@ func SavePushData(title, body, token string, timestamp, priority int64) (p *Push
 		Accessed:      false,
 		Priority:      priority,
 		Sound:         true,
+		Url:           strurl,
 	}
 	if err = db.Save(p).Error; err != nil {
 		fmt.Printf("%v", err)
@@ -166,8 +171,8 @@ func SavePushData(title, body, token string, timestamp, priority int64) (p *Push
 	return p, nil
 }
 
-func SavePushDataMinimal(title, body, token string, priority int64) (p *PushData, err error) {
-	return SavePushData(title, body, token, 0, priority)
+func SavePushDataMinimal(title, body, token, url string, priority int64) (p *PushData, err error) {
+	return SavePushData(title, body, token, url, 0, priority)
 }
 
 func (p *PushData) SetAccessed() {

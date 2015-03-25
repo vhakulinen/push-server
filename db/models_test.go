@@ -103,23 +103,26 @@ func TestSavePushData(t *testing.T) {
 		Token     string
 		TimeStamp int64
 		Priority  int64
+		Url       string
 
 		ExpectingErr bool
 	}{
-		{"required", "", token, -1, 1, true}, // Timestamp less than 0
-		{"required", "", token, 123, 1, false},
-		{"required", "", token, 123, 2, false},
-		{"required", "", token, 123, 10, false}, // Priority should default to 1
-		{"required", "", token, 123, 0, false},  // Priority should default to 1
-		{"", "bod", token, 0, 1, true},          // No title
-		{"title", "body", "", 0, 1, true},       // To token
-		{"title", "body", token, 123, 1, false}, // Everything is good
-		{"there is no", "valid token", "invalidtoken", 0, 1, true},
+		{"required", "", token, -1, 1, "", true}, // Timestamp less than 0
+		{"required", "", token, 123, 1, "http://duckduckgo.com/", false},
+		{"required", "", token, 123, 1, "https://nixers.net/", false},
+		{"required", "", token, 123, 1, "invalid_url", false},
+		{"required", "", token, 123, 2, "qwe", false},
+		{"required", "", token, 123, 10, "lotsof.coffee", false}, // Priority should default to 1
+		{"required", "", token, 123, 0, "", false},               // Priority should default to 1
+		{"", "bod", token, 0, 1, "", true},                       // No title
+		{"title", "body", "", 0, 1, "", true},                    // To token
+		{"title", "body", token, 123, 1, "", false},              // Everything is good
+		{"there is no", "valid token", "invalidtoken", 0, 1, "", true},
 	}
 
 	for _, data := range testData {
 		pushData, err := SavePushData(data.Title, data.Body, data.Token,
-			data.TimeStamp, data.Priority)
+			data.Url, data.TimeStamp, data.Priority)
 		if err != nil {
 			if !data.ExpectingErr {
 				t.Errorf("Got error while not expecting one! (%v)", err)
@@ -150,6 +153,9 @@ func TestSavePushData(t *testing.T) {
 		if pushData.Sound != true {
 			t.Errorf("PushData.Sound should default to true")
 		}
+		if pushData.Url != data.Url {
+			t.Errorf("Url doesnt match (%v != %v)", pushData.Url, data.Url)
+		}
 
 		db.Unscoped().Delete(pushData)
 	}
@@ -160,10 +166,13 @@ func TestToJson(t *testing.T) {
 	body := "body"
 	var time int64
 	time = 1
+	uri := "https://ddg.gg/"
 	type pushData struct {
 		Title         string
 		Body          string
 		UnixTimeStamp int64
+		Url           string
+		Sound         bool
 	}
 
 	u, err := NewUser("to@jsontest.com", "password")
@@ -172,7 +181,7 @@ func TestToJson(t *testing.T) {
 	}
 	token := u.Token
 
-	pushdata, err := SavePushData(title, body, token, time, 1)
+	pushdata, err := SavePushData(title, body, token, uri, time, 1)
 	if err != nil {
 		t.Fatalf("Failed to create push data! (%v)", err)
 	}
@@ -192,6 +201,9 @@ func TestToJson(t *testing.T) {
 	}
 	if v.UnixTimeStamp != time {
 		t.Errorf("Timestamps didn't match! (%v != %v)", time, v.UnixTimeStamp)
+	}
+	if v.Url != uri {
+		t.Errorf("Urls didn't match! (%v != %v)", uri, v.Url)
 	}
 
 	db.Unscoped().Delete(pushdata)
