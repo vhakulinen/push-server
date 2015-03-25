@@ -294,8 +294,8 @@ func TestPushHandler(t *testing.T) {
 		// All cases below are expected to fail
 		{"title", "body", "invalidtoken", "", "10", 200},
 
-		{"title", "body", "token", "invalidtimestapm", "", 400},
-		{"title", "body", "token", "-11", "", 400},
+		{"title", "body", "token", "invalidtimestapm", "", 200},
+		{"title", "body", "token", "-11", "", 200},
 		{"", "noTokenNorTitle", "", "", "2", 200},
 		{"", "noTokenNorTitle", "", "", "3", 200},
 		{"", "noTokenNorTitleWithTimeStamp", "", "100", "nn", 200},

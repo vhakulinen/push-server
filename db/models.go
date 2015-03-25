@@ -117,6 +117,7 @@ type PushData struct {
 
 	Accessed bool `json:"-"`
 
+	// Timestamp defaults to 0 if invalid
 	UnixTimeStamp int64
 	Title         string `sql:"not null"`
 	Body          string
@@ -140,7 +141,7 @@ type PushData struct {
 
 func SavePushData(title, body, token, strurl string, timestamp, priority int64) (p *PushData, err error) {
 	if timestamp < 0 {
-		return nil, fmt.Errorf("Timestamp can't be less than 0")
+		timestamp = 0
 	}
 	if title == "" || token == "" {
 		return nil, fmt.Errorf("token and title required")
@@ -169,10 +170,6 @@ func SavePushData(title, body, token, strurl string, timestamp, priority int64) 
 		return nil, err
 	}
 	return p, nil
-}
-
-func SavePushDataMinimal(title, body, token, url string, priority int64) (p *PushData, err error) {
-	return SavePushData(title, body, token, url, 0, priority)
 }
 
 func (p *PushData) SetAccessed() {

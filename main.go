@@ -72,6 +72,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	var pushData *db.PushData
 	var err error
 	var priority int
+	var timestamp int64
 
 	title := r.FormValue("title")
 	body := r.FormValue("body")
@@ -89,29 +90,17 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if stimestamp != "" {
-		timestamp, err := strconv.ParseInt(stimestamp, 10, 64)
-		if err != nil {
-			log.Printf("Failed to parse timestamp int PushHandler() (%v)", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Failed to parse timestamp"))
-			return
-		} else if timestamp < 0 {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Timestamp can't be less than 0"))
-			return
-		}
-		pushData, err = db.SavePushData(title, body, token, uri, timestamp, int64(priority))
-		if err != nil {
-			log.Printf("Something went wrong! (%v)", err)
-			return
-		}
-	} else {
-		pushData, err = db.SavePushDataMinimal(title, body, token, uri, int64(priority))
-		if err != nil {
-			log.Printf("Something went wrong! (%v)", err)
-			return
-		}
+	timestamp, err = strconv.ParseInt(stimestamp, 10, 64)
+	if err != nil {
+		timestamp = 0
+	} else if timestamp < 0 {
+		timestamp = 0
+	}
+
+	pushData, err = db.SavePushData(title, body, token, uri, timestamp, int64(priority))
+	if err != nil {
+		log.Printf("Something went wrong! (%v)", err)
+		return
 	}
 
 	if pushData.Priority != 3 {

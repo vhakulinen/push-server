@@ -107,7 +107,7 @@ func TestSavePushData(t *testing.T) {
 
 		ExpectingErr bool
 	}{
-		{"required", "", token, -1, 1, "", true}, // Timestamp less than 0
+		{"required", "", token, -1, 1, "", false},
 		{"required", "", token, 123, 1, "http://duckduckgo.com/", false},
 		{"required", "", token, 123, 1, "https://nixers.net/", false},
 		{"required", "", token, 123, 1, "invalid_url", false},
@@ -137,7 +137,7 @@ func TestSavePushData(t *testing.T) {
 		if pushData.Body != data.Body {
 			t.Errorf("Bodies didn't match! (%v != %v)", data.Body, pushData.Body)
 		}
-		if pushData.UnixTimeStamp != data.TimeStamp {
+		if data.TimeStamp >= 0 && pushData.UnixTimeStamp != data.TimeStamp {
 			t.Errorf("Timestamps didn't match! (%v != %v)", data.TimeStamp, pushData.UnixTimeStamp)
 		}
 		if pushData.Token != data.Token {
