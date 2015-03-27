@@ -91,7 +91,6 @@ curl localhost:8080/push/ -d token=<your_token_here> -d body=<message_body> \
 This regsiters new Google Cloud Messaging client to specified token
 ```
 curl localhost:8080/gcm/ -d token=<token> -d gcmid=<gcmid>
--d title=<message_title>
 ```
 
 #### Expects
