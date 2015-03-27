@@ -97,16 +97,34 @@ func HandleTCPClient(conn net.Conn) {
 	// No need for deadline anymore
 	conn.SetReadDeadline(time.Time{})
 
+	wg := sync.WaitGroup{}
+
 	go func() {
-		conn.Read(make([]byte, 1))
-		quitChan <- true
+		// Read 10 seconds for something from client - if we hit EOF,
+		// the client has closed the connection; on time out
+		// try again.
+		wg.Add(1)
+		for {
+			conn.SetReadDeadline(time.Now().Add(time.Second * 10))
+			if _, err := conn.Read(make([]byte, 1)); err == io.EOF {
+				quitChan <- true
+				break
+			}
+		}
+		wg.Done()
 	}()
 
 	for {
+		// Even if we exit from here first, instead from the read
+		// goroutine, there is no point trying to notify it since
+		// its blocking on conn.Read for < 10secs or already exited
 		select {
 		case data, ok := <-sendChan:
 			if ok {
-				conn.Write([]byte(data + "\n"))
+				_, err := conn.Write([]byte(data + "\n"))
+				if err == io.EOF {
+					return
+				}
 			} else {
 				return
 			}
@@ -114,6 +132,7 @@ func HandleTCPClient(conn net.Conn) {
 			return
 		}
 	}
+	wg.Wait()
 }
 
 func init() {
