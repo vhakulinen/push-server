@@ -9,7 +9,7 @@ or say for your mobile (if someone creates app for it)
 
 ## HTTP API
 ### /regsiter/
-This will register new accout and returns either new accout's token
+This will register new account and returns either new account's token
 or message to check email.
 ```
 curl localhost:8080/register/ -d email=<email> -d password=<password>
