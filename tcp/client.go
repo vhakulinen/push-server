@@ -84,8 +84,7 @@ func HandleTCPClient(conn net.Conn) {
 		return
 	}
 
-	token = string(buf)
-	if !db.TokenExists(fmt.Sprintf("%s", token)) {
+	if !db.TokenExists(fmt.Sprintf("%s", string(buf))) {
 		conn.Write([]byte("Token not found!"))
 		return
 	}
@@ -93,6 +92,7 @@ func HandleTCPClient(conn net.Conn) {
 		conn.Write([]byte("Client already listening for this token"))
 		return
 	}
+	token = string(buf)
 
 	// No need for deadline anymore
 	conn.SetReadDeadline(time.Time{})
