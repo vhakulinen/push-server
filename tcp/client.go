@@ -62,14 +62,12 @@ var ClientFromPool = func(token string) (chan<- string, bool) {
 func HandleTCPClient(conn net.Conn) {
 	var token string
 	var sendChan = make(chan string)
-	var quitChan = make(chan bool)
 	defer func() {
 		conn.Close()
 		if token != "" {
 			peers.Remove(token)
 		}
 		close(sendChan)
-		close(quitChan)
 	}()
 	// Dont wait forever for the first message
 	conn.SetReadDeadline(time.Now().Add(time.Second * tokenReadDeadLine))
@@ -88,51 +86,37 @@ func HandleTCPClient(conn net.Conn) {
 		conn.Write([]byte("Token not found!"))
 		return
 	}
-	if err = peers.Set(token, sendChan); err != nil {
+	if err = peers.Set(string(buf), sendChan); err != nil {
 		conn.Write([]byte("Client already listening for this token"))
 		return
 	}
 	token = string(buf)
 
-	// No need for deadline anymore
-	conn.SetReadDeadline(time.Time{})
-
-	wg := sync.WaitGroup{}
-
-	go func() {
-		// Read 10 seconds for something from client - if we hit EOF,
-		// the client has closed the connection; on time out
-		// try again.
-		wg.Add(1)
-		for {
-			conn.SetReadDeadline(time.Now().Add(time.Second * 10))
-			if _, err := conn.Read(make([]byte, 1)); err == io.EOF {
-				quitChan <- true
-				break
-			}
-		}
-		wg.Done()
-	}()
-
 	for {
-		// Even if we exit from here first, instead from the read
-		// goroutine, there is no point trying to notify it since
-		// its blocking on conn.Read for < 10secs or already exited
+		c := time.After(time.Second * 10)
 		select {
 		case data, ok := <-sendChan:
 			if ok {
 				_, err := conn.Write([]byte(data + "\n"))
-				if err == io.EOF {
+				if err != nil {
 					return
 				}
 			} else {
 				return
 			}
-		case <-quitChan:
-			return
+		case <-c:
+			conn.SetReadDeadline(time.Now().Add(time.Second * 2))
+			_, err := conn.Read(make([]byte, 1))
+			if err != nil {
+				if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
+					// All good, just normal timeout
+					continue
+				}
+				// Propaply EOF error
+				return
+			}
 		}
 	}
-	wg.Wait()
 }
 
 func init() {
