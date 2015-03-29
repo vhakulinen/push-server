@@ -110,10 +110,15 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				// TODO: something went really wrong
 			} else {
-				send <- string(data)
-				if pushData.Priority == 2 {
-					pushData.Sound = false
-					pushData.Save()
+				select {
+				case send <- string(data):
+					if pushData.Priority == 2 {
+						pushData.Sound = false
+						pushData.Save()
+					}
+				default:
+					// Buffer is full and tcp client is hanging on ping
+					// message
 				}
 			}
 		}

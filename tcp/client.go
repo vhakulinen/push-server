@@ -3,11 +3,13 @@ package tcp
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/vhakulinen/push-server/db"
+	"github.com/vhakulinen/push-server/utils"
 )
 
 const (
@@ -15,6 +17,11 @@ const (
 	tokenReadDeadLine = 60
 	// The token's length is 36, so lets only read it
 	tokenMessageLen = 36
+
+	pingTimeout  = 20
+	pingInterval = 120
+
+	chanBufferSize = 100
 )
 
 type tcpPool struct {
@@ -61,7 +68,7 @@ var ClientFromPool = func(token string) (chan<- string, bool) {
 
 func HandleTCPClient(conn net.Conn) {
 	var token string
-	var sendChan = make(chan string)
+	var sendChan = make(chan string, chanBufferSize)
 	defer func() {
 		conn.Close()
 		if token != "" {
@@ -92,8 +99,8 @@ func HandleTCPClient(conn net.Conn) {
 	}
 	token = string(buf)
 
+	c := time.After(time.Second * pingInterval)
 	for {
-		c := time.After(time.Second * 10)
 		select {
 		case data, ok := <-sendChan:
 			if ok {
@@ -105,16 +112,24 @@ func HandleTCPClient(conn net.Conn) {
 				return
 			}
 		case <-c:
-			conn.SetReadDeadline(time.Now().Add(time.Second * 2))
-			_, err := conn.Read(make([]byte, 1))
-			if err != nil {
-				if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
-					// All good, just normal timeout
-					continue
-				}
-				// Propaply EOF error
+			// Send ping
+			msg := utils.RandomString(5)
+			i, err := conn.Write([]byte(fmt.Sprintf(":PING %s", msg)))
+			if i != 11 || err != nil {
+				log.Printf("%v", err)
 				return
 			}
+
+			// Read pong
+			conn.SetReadDeadline(time.Now().Add(time.Second * pingTimeout))
+			buf := make([]byte, 11)
+			i, err = conn.Read(buf)
+
+			// Check it
+			if i != 11 || err != nil || string(buf) != fmt.Sprintf(":PONG %s", msg) {
+				return
+			}
+			c = time.After(time.Second * pingInterval)
 		}
 	}
 }
