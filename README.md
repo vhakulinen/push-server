@@ -112,6 +112,13 @@ connect to push-server with TCP/TLS connection (default port 9911) and
 send your token AND NOTHING ELSE. You'll now receive notifies where
 priority != 3. TCP client uses IRC-like ping pong messages.
 
+### PONG
+
+When server sends ping message, it won't send any push data to that client
+until it responses with pong message. Ping message format is following:
+`:PING <5char token>\n`. Pong message: `:PONG <5 char token from server>\n`.
+Note the `\n` characther!
+
 ### Server
 Copy the push-serv.conf.def file to push-serv.conf or add the path with -config flag
 
