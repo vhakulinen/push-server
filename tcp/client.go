@@ -84,17 +84,17 @@ func HandleTCPClient(conn net.Conn) {
 	if err != nil {
 		//TODO: logging
 		if count < tokenMessageLen {
-			conn.Write([]byte("Timeout"))
+			conn.Write([]byte("Timeout\n"))
 		}
 		return
 	}
 
 	if !db.TokenExists(fmt.Sprintf("%s", string(buf))) {
-		conn.Write([]byte("Token not found!"))
+		conn.Write([]byte("Token not found!\n"))
 		return
 	}
 	if err = peers.Set(string(buf), sendChan); err != nil {
-		conn.Write([]byte("Client already listening for this token"))
+		conn.Write([]byte("Client already listening for this token\n"))
 		return
 	}
 	token = string(buf)
@@ -114,19 +114,19 @@ func HandleTCPClient(conn net.Conn) {
 		case <-c:
 			// Send ping
 			msg := utils.RandomString(5)
-			i, err := conn.Write([]byte(fmt.Sprintf(":PING %s", msg)))
-			if i != 11 || err != nil {
+			i, err := conn.Write([]byte(fmt.Sprintf(":PING %s\n", msg)))
+			if i != 12 || err != nil {
 				log.Printf("%v", err)
 				return
 			}
 
 			// Read pong
 			conn.SetReadDeadline(time.Now().Add(time.Second * pingTimeout))
-			buf := make([]byte, 11)
+			buf := make([]byte, 12)
 			i, err = conn.Read(buf)
 
 			// Check it
-			if i != 11 || err != nil || string(buf) != fmt.Sprintf(":PONG %s", msg) {
+			if i != 12 || err != nil || string(buf) != fmt.Sprintf(":PONG %s\n", msg) {
 				return
 			}
 			c = time.After(time.Second * pingInterval)
