@@ -110,7 +110,7 @@ curl localhost:8080/gcm/ -d token=<token> -d gcmid=<gcmid>
 TCP clients is used to receive live notifies. To use this feature,
 connect to push-server with TCP/TLS connection (default port 9911) and
 send your token AND NOTHING ELSE. You'll now receive notifies where
-priority != 3.
+priority != 3. TCP client uses IRC-like ping pong messages.
 
 ### Server
 Copy the push-serv.conf.def file to push-serv.conf or add the path with -config flag
