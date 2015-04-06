@@ -1,5 +1,5 @@
 # push-server
-Server to receive and send notifies to clients.
+Server to receive and send notifications to clients.
 
 ## Use case
 * Irc message notifies
@@ -8,7 +8,7 @@ Server to receive and send notifies to clients.
 or say for your mobile (if someone creates app for it)
 
 ## HTTP API
-### /regsiter/
+### /register/
 This will register new account and returns either new account's token
 or message to check email.
 ```
