@@ -2,7 +2,7 @@
 Server to receive and send notifications to clients.
 
 ## Use case
-* Irc message notifies
+* Irc message notifies ([irssi](https://gist.github.com/vhakulinen/d1d96d3aa8790c0a11dc))
 * Notify after long command has ran on remote machine
 * Basicly when ever you want notifies from remote machines to your desktop/laptop
 or say for your mobile (if someone creates app for it)
