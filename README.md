@@ -106,7 +106,7 @@ curl localhost:8080/gcm/ -d token=<token> -d gcmid=<gcmid>
 |ERROR|400|
 |Something wen't wrong on server|500|
 
-### /gcm/
+### /ungcm/
 This unregsiters Google Cloud Messaging client
 ```
 curl localhost:8080/ungcm/ -d gcmid=<gcmid>
