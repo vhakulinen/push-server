@@ -194,10 +194,7 @@ func (p *PushData) ToJson() ([]byte, error) {
 }
 
 type GCMClient struct {
-	Id         int64
-	CreatedAt  time.Time
-	ModifiedAt time.Time
-	DeletedAt  time.Time
+	Id int64
 
 	GCMId string `sql:"not null;unique" gorm:"column:gcm_id"`
 	Token string `sql:"not null"`
@@ -253,4 +250,8 @@ func (g GCMClient) TableName() string {
 
 func (g *GCMClient) Save() {
 	db.Save(g)
+}
+
+func (g *GCMClient) Delete() {
+	db.Delete(g)
 }

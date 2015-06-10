@@ -106,6 +106,23 @@ curl localhost:8080/gcm/ -d token=<token> -d gcmid=<gcmid>
 |ERROR|400|
 |Something wen't wrong on server|500|
 
+### /gcm/
+This unregsiters Google Cloud Messaging client
+```
+curl localhost:8080/ungcm/ -d gcmid=<gcmid>
+```
+
+#### Expects
+|param|required|type|defualts|
+|-----|--------|----|--------|
+|gcmid|yes|string||
+
+#### Returns
+|status|return value|
+|------|------------|
+|OK|200|
+|ERROR|200|
+
 ## TCP clients
 TCP clients is used to receive live notifies. To use this feature,
 connect to push-server with TCP/TLS connection (default port 9911) and

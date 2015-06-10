@@ -490,3 +490,53 @@ func TestGCMRegisterHandler(t *testing.T) {
 		}
 	}
 }
+
+func TestGMCUnregisterHandler(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(GCMUnregisterHandler))
+	defer ts.Close()
+
+	gcmId := "GCMID"
+
+	u, err := db.NewUser("unregistergcm@gcm.com", "password")
+	if err != nil {
+		t.Fatalf("Failed to create user (%v)", err)
+	}
+	_, err = db.RegisterGCMClient(gcmId, u.Token)
+	if err != nil {
+		t.Fatalf("Failed to create gcm client (%v)", err)
+	}
+
+	var testData = []struct {
+		gcmid        string
+		expectedCode int
+		entryDeleted bool // flag to check if the entry should be removed
+	}{
+		{"invalidToken", 200, false},
+		{gcmId, 200, true},
+	}
+
+	for _, d := range testData {
+		// Valid - this sould remove the gcm client
+		form := url.Values{}
+		form.Add("gcmid", d.gcmid)
+		res, err := http.PostForm(ts.URL, form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != d.expectedCode {
+			t.Errorf("Expected %s but got %s instead!", 200, res.StatusCode)
+		}
+
+		_, err = db.GetGCMClient(gcmId)
+		if d.entryDeleted {
+			if err == nil {
+				t.Errorf("GCMClient should be deleted but is not")
+			}
+		} else {
+			if err != nil {
+				t.Errorf("GCMClient shouldn't be deleted but is")
+			}
+		}
+	}
+}

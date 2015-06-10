@@ -198,6 +198,20 @@ func GCMRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func GCMUnregisterHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	gcmId := r.FormValue("gcmid")
+	if gcmId == "" {
+		return
+	} else {
+		g, err := db.GetGCMClient(gcmId)
+		if err != nil {
+			return
+		}
+		g.Delete()
+	}
+}
+
 func startTcp(addr string, config *tls.Config) {
 	sock, err := tls.Listen("tcp", addr, config)
 	if err != nil {
@@ -267,6 +281,7 @@ func main() {
 	http.HandleFunc("/pool/", PoolHandler)
 	http.HandleFunc("/retrieve/", RetrieveHandler)
 	http.HandleFunc("/gcm/", GCMRegisterHandler)
+	http.HandleFunc("/ungcm/", GCMUnregisterHandler)
 
 	if err := http.ListenAndServeTLS(httpHostPort, certPemFile, keyPemFile, nil); err != nil {
 		panic(err)

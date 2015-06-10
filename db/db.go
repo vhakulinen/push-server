@@ -32,6 +32,14 @@ func GetAllPushDatas() []PushData {
 	return pushdatas
 }
 
+func GetGCMClient(id string) (*GCMClient, error) {
+	g := new(GCMClient)
+	if db.Where("gcm_id = ?", id).First(g).RecordNotFound() {
+		return nil, fmt.Errorf("Client not found")
+	}
+	return g, nil
+}
+
 func GetUser(email string) (*User, error) {
 	u := new(User)
 	if db.Where("email = ?", email).First(u).RecordNotFound() {
