@@ -103,7 +103,7 @@ func TestSavePushData(t *testing.T) {
 		Token     string
 		TimeStamp int64
 		Priority  int64
-		Url       string
+		URL       string
 
 		ExpectingErr bool
 	}{
@@ -122,7 +122,7 @@ func TestSavePushData(t *testing.T) {
 
 	for _, data := range testData {
 		pushData, err := SavePushData(data.Title, data.Body, data.Token,
-			data.Url, data.TimeStamp, data.Priority)
+			data.URL, data.TimeStamp, data.Priority)
 		if err != nil {
 			if !data.ExpectingErr {
 				t.Errorf("Got error while not expecting one! (%v)", err)
@@ -153,8 +153,8 @@ func TestSavePushData(t *testing.T) {
 		if pushData.Sound != true {
 			t.Errorf("PushData.Sound should default to true")
 		}
-		if pushData.Url != data.Url {
-			t.Errorf("Url doesnt match (%v != %v)", pushData.Url, data.Url)
+		if pushData.URL != data.URL {
+			t.Errorf("Url doesnt match (%v != %v)", pushData.URL, data.URL)
 		}
 
 		db.Unscoped().Delete(pushData)
@@ -171,7 +171,7 @@ func TestToJson(t *testing.T) {
 		Title         string
 		Body          string
 		UnixTimeStamp int64
-		Url           string
+		URL           string
 		Sound         bool
 	}
 
@@ -187,7 +187,7 @@ func TestToJson(t *testing.T) {
 	}
 	defer db.Unscoped().Delete(pushdata)
 
-	b, err := pushdata.ToJson()
+	b, err := pushdata.ToJSON()
 	v := &pushData{}
 	err = json.Unmarshal(b, v)
 	if err != nil {
@@ -202,8 +202,8 @@ func TestToJson(t *testing.T) {
 	if v.UnixTimeStamp != time {
 		t.Errorf("Timestamps didn't match! (%v != %v)", time, v.UnixTimeStamp)
 	}
-	if v.Url != uri {
-		t.Errorf("Urls didn't match! (%v != %v)", uri, v.Url)
+	if v.URL != uri {
+		t.Errorf("Urls didn't match! (%v != %v)", uri, v.URL)
 	}
 
 	db.Unscoped().Delete(pushdata)

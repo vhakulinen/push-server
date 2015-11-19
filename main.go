@@ -21,7 +21,7 @@ var configFile = flag.String("config", "push-serv.conf", "Path to config file")
 var httpHostPort string
 var skipEmailVerification bool
 
-func ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
+func activateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var writeBadRequest = func() {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(http.StatusText(http.StatusBadRequest)))
@@ -47,7 +47,7 @@ func ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+func registerHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	semail := r.FormValue("email")
 	password := r.FormValue("password")
@@ -68,7 +68,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func PushHandler(w http.ResponseWriter, r *http.Request) {
+func pushHandler(w http.ResponseWriter, r *http.Request) {
 	var pushData *db.PushData
 	var err error
 	var priority int
@@ -106,7 +106,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	if pushData.Priority != 3 {
 		// Send this to TCP client if any
 		if send, ok := tcp.ClientFromPool(token); ok {
-			data, err := pushData.ToJson()
+			data, err := pushData.ToJSON()
 			if err != nil {
 				// TODO: something went really wrong
 			} else {
@@ -143,7 +143,7 @@ func PushHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func PoolHandler(w http.ResponseWriter, r *http.Request) {
+func poolHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	data := ""
 	token := r.FormValue("token")
@@ -152,7 +152,7 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 			if push.Accessed {
 				continue
 			}
-			tmp, err := push.ToJson()
+			tmp, err := push.ToJSON()
 			push.SetAccessed()
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -166,7 +166,7 @@ func PoolHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(data))
 }
 
-func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
+func retrieveHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	semail := r.FormValue("email")
 	password := r.FormValue("password")
@@ -179,15 +179,15 @@ func RetrieveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func GCMRegisterHandler(w http.ResponseWriter, r *http.Request) {
+func gcmRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	token := r.FormValue("token")
-	gcmId := r.FormValue("gcmid")
-	if gcmId == "" || token == "" {
+	gcmID := r.FormValue("gcmid")
+	if gcmID == "" || token == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(http.StatusText(http.StatusBadRequest)))
 	} else {
-		_, err := db.RegisterGCMClient(gcmId, token)
+		_, err := db.RegisterGCMClient(gcmID, token)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(http.StatusText(http.StatusInternalServerError)))
@@ -198,21 +198,20 @@ func GCMRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func GCMUnregisterHandler(w http.ResponseWriter, r *http.Request) {
+func gcmUnregisterHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	gcmId := r.FormValue("gcmid")
-	if gcmId == "" {
+	gcmID := r.FormValue("gcmid")
+	if gcmID == "" {
 		return
-	} else {
-		g, err := db.GetGCMClient(gcmId)
-		if err != nil {
-			return
-		}
-		g.Delete()
 	}
+	g, err := db.GetGCMClient(gcmID)
+	if err != nil {
+		return
+	}
+	g.Delete()
 }
 
-func startTcp(addr string, config *tls.Config) {
+func startTCP(addr string, config *tls.Config) {
 	sock, err := tls.Listen("tcp", addr, config)
 	if err != nil {
 		log.Fatalf("startTCP: failed to bind socket (%v)\n", err)
@@ -273,15 +272,15 @@ func main() {
 		log.SetOutput(f)
 	}
 
-	go startTcp(tcpHostPort, &config)
+	go startTCP(tcpHostPort, &config)
 
-	http.HandleFunc("/register/", RegisterHandler)
-	http.HandleFunc("/activate/", ActivateUserHandler)
-	http.HandleFunc("/push/", PushHandler)
-	http.HandleFunc("/pool/", PoolHandler)
-	http.HandleFunc("/retrieve/", RetrieveHandler)
-	http.HandleFunc("/gcm/", GCMRegisterHandler)
-	http.HandleFunc("/ungcm/", GCMUnregisterHandler)
+	http.HandleFunc("/register/", registerHandler)
+	http.HandleFunc("/activate/", activateUserHandler)
+	http.HandleFunc("/push/", pushHandler)
+	http.HandleFunc("/pool/", poolHandler)
+	http.HandleFunc("/retrieve/", retrieveHandler)
+	http.HandleFunc("/gcm/", gcmRegisterHandler)
+	http.HandleFunc("/ungcm/", gcmUnregisterHandler)
 
 	if err := http.ListenAndServeTLS(httpHostPort, certPemFile, keyPemFile, nil); err != nil {
 		panic(err)

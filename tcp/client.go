@@ -61,11 +61,13 @@ func (t *tcpPool) Remove(token string) error {
 
 var peers tcpPool
 
+// ClientFromPool is link to map where TCP client send channels are kept
 var ClientFromPool = func(token string) (chan<- string, bool) {
 	c, ok := peers.Get(token)
 	return c, ok
 }
 
+// HandleTCPClient handles new TCP client connections
 func HandleTCPClient(conn net.Conn) {
 	var token string
 	var sendChan = make(chan string, chanBufferSize)

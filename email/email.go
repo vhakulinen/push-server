@@ -52,6 +52,7 @@ var sendGRID = func(m, email string) error {
 	return err
 }
 
+// SendRegisterationEmail sends email to u.Email with link to activate the User
 var SendRegistrationEmail = func(u *db.User) error {
 	if !configLoaded {
 		LoadConfig()
@@ -61,6 +62,7 @@ var SendRegistrationEmail = func(u *db.User) error {
 	return sendMail(regMessage, u.Email)
 }
 
+// LoadConfig loads this package's configuration fron config.Config package
 func LoadConfig() {
 	emailType, _ := config.Config.String("email", "type")
 	from, _ = config.Config.String("email", "from")

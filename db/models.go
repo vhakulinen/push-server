@@ -16,29 +16,45 @@ import (
 )
 
 const (
-	MinPasswordLength   = 6
+	// MinPasswordLength specifies the minimiun password length
+	MinPasswordLength = 6
+	// PasswordSaltLength specifies the length of salt used with hashing passwords
 	PasswordSaltLength  = 16
 	activateTokenLength = 6
 
 	emailRegexStr = "(\\w[-._\\w]*\\w@\\w[-._\\w]*\\w\\.\\w{2,3})"
 )
 
+// User is the user object mapped in database. Contains all relevant information about user.
 type User struct {
-	Id         int64
-	CreatedAt  time.Time
+	// ID is the primary key used in databse
+	ID int64
+	// CreatedAt is the date when this user was created in database level
+	CreatedAt time.Time
+	// ModifiedAt is the date when this user was last modified in database level
 	ModifiedAt time.Time
-	DeletedAt  time.Time
+	// DeletedAt is the date when user was /soft/ deleted in database level
+	DeletedAt time.Time
 
-	Active        bool
+	// Active is the flag indicating if the user is activated with email or not.
+	// If user is not activated it cannot be used. Email activation can be skipped
+	// within the server's configuration file
+	Active bool
+	// ActivateToken is used to securely activate the user with email. It is added
+	// to the link sent in the activation email
 	ActivateToken string
 
-	Email      string `sql:"not null;unique"`
-	Password   string
-	Token      string `sql:"unique"`
+	// Email is the email user provoided when he/she registered to this service
+	Email string `sql:"not null;unique"`
+	// Password is the user's password
+	Password string
+	// Token is the token which is used to push/pool data
+	Token string `sql:"unique"`
+	// GCMClients are the clients registered with GoogleCloudMessaging service to this user
 	GCMClients []GCMClient
 }
 
-// Creates new user and saves it to database
+// NewUser creates new user and saves it to database
 func NewUser(email, password string) (*User, error) {
 	u := new(User)
 	if email == "" || password == "" {
@@ -68,6 +84,7 @@ func NewUser(email, password string) (*User, error) {
 	return nil, fmt.Errorf("User exists")
 }
 
+// BeforeCreate is function ran by gorm library before the user is created.
 func (u *User) BeforeCreate() error {
 	// Password hashing and salting
 	if len(u.Password) < MinPasswordLength {
@@ -82,21 +99,26 @@ func (u *User) BeforeCreate() error {
 	return nil
 }
 
+// AfterFind is function rab by gorm library after database query is ran
+// agains User table. In this case its used to load data to User object.
 func (u *User) AfterFind() {
 	gcmClients := []GCMClient{}
 	db.Where("token = ?", u.Token).Find(&gcmClients)
 	u.GCMClients = gcmClients
 }
 
+// Activate activates the user (sets User.Active to true and saves it to database)
 func (u *User) Activate() {
 	u.Active = true
 	db.Save(u)
 }
 
+// Save is shortcut to save object to database
 func (u *User) Save() {
 	db.Save(u)
 }
 
+// ValidatePassword checks if specified password is the correct password for the user
 func (u *User) ValidatePassword(password string) bool {
 	// TODO: Check that slice is not out of bounds
 	hash := sha256.Sum256([]byte(password + u.Password[:PasswordSaltLength]))
@@ -110,22 +132,29 @@ func (u *User) ValidatePassword(password string) bool {
 	return false
 }
 
+// PushData is the object mapped on database. This is the object containing
+// the data user may push through to other devices using this service.
 type PushData struct {
-	Id        int64     `json:"-"`
+	// ID is the primary key used in databse
+	ID int64 `json:"-"`
+	// CreatedAt is the date when this user was created in database level
 	CreatedAt time.Time `json:"-"`
+	// DeletedAt is the date when user was /soft/ deleted in database level
 	DeletedAt time.Time `json:"-"`
 
+	// Accessed indicates if this data has already pooled by client (the one user design flaw lies in here)
 	Accessed bool `json:"-"`
 
+	// UinxTimeStamp is the timestamp which client can specify when sending data
 	// Timestamp defaults to 0 if invalid
 	UnixTimeStamp int64
 	Title         string `sql:"not null"`
 	Body          string
 	Token         string `sql:"not null" json:"-"`
-	// Url to open on client side
+	// URL to open on client side
 	//
-	// Url is not validated
-	Url string
+	// URL is not validated
+	URL string
 	// Priority defines whether we send the data to all clients, do we make seound etc.
 	//
 	// Possible values:
@@ -139,6 +168,7 @@ type PushData struct {
 	Sound    bool
 }
 
+// SavePushData saves push data to the database
 func SavePushData(title, body, token, strurl string, timestamp, priority int64) (p *PushData, err error) {
 	if timestamp < 0 {
 		timestamp = 0
@@ -163,7 +193,7 @@ func SavePushData(title, body, token, strurl string, timestamp, priority int64) 
 		Accessed:      false,
 		Priority:      priority,
 		Sound:         true,
-		Url:           strurl,
+		URL:           strurl,
 	}
 	if err = db.Save(p).Error; err != nil {
 		fmt.Printf("%v", err)
@@ -172,20 +202,24 @@ func SavePushData(title, body, token, strurl string, timestamp, priority int64) 
 	return p, nil
 }
 
+// SetAccessed sets Accessed property to true and saves it to database
 func (p *PushData) SetAccessed() {
 	p.Accessed = true
 	p.Save()
 }
 
+// Save is shortcut to save data to database
 func (p *PushData) Save() {
 	db.Save(p)
 }
 
+// Delete is shortcut to delete data from database
 func (p *PushData) Delete() {
 	db.Delete(p)
 }
 
-func (p *PushData) ToJson() ([]byte, error) {
+// ToJSON returns this object as JSON string (byte array)
+func (p *PushData) ToJSON() ([]byte, error) {
 	b, err := json.Marshal(p)
 	if err != nil {
 		return nil, err
@@ -193,23 +227,27 @@ func (p *PushData) ToJson() ([]byte, error) {
 	return b, nil
 }
 
+// GCMClient is object mapped in database. Holds data of GoogleCloudMessaging clients
+// registered by user
 type GCMClient struct {
-	Id int64
+	ID int64
 
 	GCMId string `sql:"not null;unique" gorm:"column:gcm_id"`
 	Token string `sql:"not null"`
 }
 
-func RegisterGCMClient(gcmId, token string) (*GCMClient, error) {
+// RegisterGCMClient registers new GoogleCloudMessaging client associating with user
+// through specfied token.
+func RegisterGCMClient(gcmID, token string) (*GCMClient, error) {
 	u := new(User)
 	if db.Where("token = ?", token).First(u).RecordNotFound() {
 		return nil, fmt.Errorf("Token not found")
 	}
 	g := new(GCMClient)
-	if db.Where("gcm_id = ?", gcmId).First(g).RecordNotFound() {
+	if db.Where("gcm_id = ?", gcmID).First(g).RecordNotFound() {
 		// If the client doesnt exist, create it
 		g = &GCMClient{
-			GCMId: gcmId,
+			GCMId: gcmID,
 			Token: token,
 		}
 		g.Save()
@@ -244,14 +282,17 @@ func RegisterGCMClient(gcmId, token string) (*GCMClient, error) {
 	}
 }
 
+// TableName is function used with gorm library
 func (g GCMClient) TableName() string {
 	return "gcm_clients"
 }
 
+// Save is shortcut to save object to database
 func (g *GCMClient) Save() {
 	db.Save(g)
 }
 
+// Delete is shortcut to delete object from database
 func (g *GCMClient) Delete() {
 	db.Delete(g)
 }

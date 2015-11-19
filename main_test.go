@@ -45,7 +45,7 @@ func TestRetrieveHandler(t *testing.T) {
 	var pass = "password"
 	var token string
 
-	ts := httptest.NewServer(http.HandlerFunc(RetrieveHandler))
+	ts := httptest.NewServer(http.HandlerFunc(retrieveHandler))
 	defer ts.Close()
 
 	// Add new user
@@ -94,7 +94,7 @@ func TestRetrieveHandler(t *testing.T) {
 }
 
 func TestActivateUserHandler(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(ActivateUserHandler))
+	ts := httptest.NewServer(http.HandlerFunc(activateUserHandler))
 	defer ts.Close()
 
 	// Register the user
@@ -142,7 +142,7 @@ func TestActivateUserHandler(t *testing.T) {
 }
 
 func TestRegisterHandler(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(RegisterHandler))
+	ts := httptest.NewServer(http.HandlerFunc(registerHandler))
 	defer ts.Close()
 
 	emailDone := false
@@ -252,7 +252,7 @@ func TestPushHandler(t *testing.T) {
 		Also, was the priority whatever, it shouldn't cause any problem
 	*/
 
-	ts := httptest.NewServer(http.HandlerFunc(PushHandler))
+	ts := httptest.NewServer(http.HandlerFunc(pushHandler))
 	defer ts.Close()
 
 	// Backup to restore
@@ -373,10 +373,10 @@ func TestPoolHandler(t *testing.T) {
 	var pushToken string
 	var pushTitle = "title"
 	var pushBody = "body"
-	var pushUrl = "www.ddg.gg"
+	var pushURL = "www.ddg.gg"
 	var pushTime = time.Now().Unix()
 
-	ts := httptest.NewServer(http.HandlerFunc(PoolHandler))
+	ts := httptest.NewServer(http.HandlerFunc(poolHandler))
 	defer ts.Close()
 
 	// Add user
@@ -387,7 +387,7 @@ func TestPoolHandler(t *testing.T) {
 	pushToken = user.Token
 
 	// Add push data
-	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushUrl, pushTime, 1)
+	_, err = db.SavePushData(pushTitle, pushBody, pushToken, pushURL, pushTime, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +406,7 @@ func TestPoolHandler(t *testing.T) {
 		UnixTimeStamp int64
 		Title         string
 		Body          string
-		Url           string
+		URL           string
 	}
 
 	for i, data := range testData {
@@ -442,15 +442,15 @@ func TestPoolHandler(t *testing.T) {
 			if v.UnixTimeStamp != pushTime {
 				t.Errorf("Got \"%v\" in time, want \"%d\"", v.UnixTimeStamp, pushTime)
 			}
-			if v.Url != pushUrl {
-				t.Errorf("Got \"%v\" in time, want \"%v\"", v.Url, pushUrl)
+			if v.URL != pushURL {
+				t.Errorf("Got \"%v\" in time, want \"%v\"", v.URL, pushURL)
 			}
 		}
 	}
 }
 
 func TestGCMRegisterHandler(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(GCMRegisterHandler))
+	ts := httptest.NewServer(http.HandlerFunc(gcmRegisterHandler))
 	defer ts.Close()
 
 	u1, err := db.NewUser("gcm1@gcm.com", "password")
@@ -492,16 +492,16 @@ func TestGCMRegisterHandler(t *testing.T) {
 }
 
 func TestGMCUnregisterHandler(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(GCMUnregisterHandler))
+	ts := httptest.NewServer(http.HandlerFunc(gcmUnregisterHandler))
 	defer ts.Close()
 
-	gcmId := "GCMID"
+	gcmID := "GCMID"
 
 	u, err := db.NewUser("unregistergcm@gcm.com", "password")
 	if err != nil {
 		t.Fatalf("Failed to create user (%v)", err)
 	}
-	_, err = db.RegisterGCMClient(gcmId, u.Token)
+	_, err = db.RegisterGCMClient(gcmID, u.Token)
 	if err != nil {
 		t.Fatalf("Failed to create gcm client (%v)", err)
 	}
@@ -512,7 +512,7 @@ func TestGMCUnregisterHandler(t *testing.T) {
 		entryDeleted bool // flag to check if the entry should be removed
 	}{
 		{"invalidToken", 200, false},
-		{gcmId, 200, true},
+		{gcmID, 200, true},
 	}
 
 	for _, d := range testData {
@@ -528,7 +528,7 @@ func TestGMCUnregisterHandler(t *testing.T) {
 			t.Errorf("Expected %s but got %s instead!", 200, res.StatusCode)
 		}
 
-		_, err = db.GetGCMClient(gcmId)
+		_, err = db.GetGCMClient(gcmID)
 		if d.entryDeleted {
 			if err == nil {
 				t.Errorf("GCMClient should be deleted but is not")

@@ -9,6 +9,8 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
+// RandomString returns new random string. l specifies the length of the
+// string to reutrn
 func RandomString(l int) string {
 	bytes := make([]byte, l)
 	for i := 0; i < l; i++ {

@@ -5,7 +5,9 @@ import (
 	"log"
 
 	"github.com/jinzhu/gorm"
+	// Load postgres
 	_ "github.com/lib/pq"
+	// Load sqlite
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/vhakulinen/push-server/config"
 )
@@ -26,12 +28,14 @@ var (
 
 var db gorm.DB
 
+// GetAllPushDatas returns /all/ PushData objects in database.
 func GetAllPushDatas() []PushData {
 	pushdatas := []PushData{}
 	db.Find(&pushdatas)
 	return pushdatas
 }
 
+// GetGCMClient returns GCMClient object if found with specified identifier.
 func GetGCMClient(id string) (*GCMClient, error) {
 	g := new(GCMClient)
 	if db.Where("gcm_id = ?", id).First(g).RecordNotFound() {
@@ -40,6 +44,7 @@ func GetGCMClient(id string) (*GCMClient, error) {
 	return g, nil
 }
 
+// GetUser returns User object if found with specified email.
 func GetUser(email string) (*User, error) {
 	u := new(User)
 	if db.Where("email = ?", email).First(u).RecordNotFound() {
@@ -48,6 +53,7 @@ func GetUser(email string) (*User, error) {
 	return u, nil
 }
 
+// GetUserByToken returns User object if found with specified token.
 func GetUserByToken(token string) (*User, error) {
 	u := new(User)
 	if db.Where("token = ?", token).First(u).RecordNotFound() {
@@ -56,6 +62,7 @@ func GetUserByToken(token string) (*User, error) {
 	return u, nil
 }
 
+// TokenExists returns boolean indicating if specified token exists.
 func TokenExists(token string) bool {
 	u := new(User)
 	if db.Where("token = ?", token).First(u).RecordNotFound() {
@@ -64,6 +71,7 @@ func TokenExists(token string) bool {
 	return true
 }
 
+// GetPushesForToken returns PushData objects linked to specified token.
 func GetPushesForToken(token string) []PushData {
 	out := []PushData{}
 	u, err := GetUserByToken(token)
@@ -73,7 +81,7 @@ func GetPushesForToken(token string) []PushData {
 	return out
 }
 
-// This is just for testing purposes
+// SetupDatabase is just for testing purposes
 func SetupDatabase() gorm.DB {
 	var err error
 	dbtype, err := config.Config.String("database", "type")
@@ -105,6 +113,7 @@ func SetupDatabase() gorm.DB {
 	return db
 }
 
+// BackupForTesting creates backup of current database before running tests.
 func BackupForTesting() {
 	if ok := db.HasTable(&User{}); ok {
 		restoreUser = true
@@ -123,6 +132,7 @@ func BackupForTesting() {
 	}
 }
 
+// RestoreFromTesting restores the database which was backedup before running tests.
 func RestoreFromTesting() {
 	if restoreUser {
 		dropTable("users")
